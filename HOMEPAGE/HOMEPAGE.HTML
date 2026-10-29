@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HABITISM - Habit Tracker</title>
+  <link rel="stylesheet" href="homepage.css">
+</head>
+<body>
+
+  <!-- Ambient starry night background -->
+  <div class="night"></div>
+  <div class="ambient-glow"></div>
+
+  <div class="container">
+
+    <!-- Top Header -->
+    <div class="header">
+      <h1>HABIT TRACKER</h1>
+      <p>Keep your daily habits blooming every day</p>
+    </div>
+
+    <!-- Main Content: Side by Side Cards (Equal Size, Above The Fold) -->
+    <div class="content">
+
+      <!-- 📅 LEFT SIDE: CALENDAR -->
+      <div class="card calendar-card">
+        <div class="card-header">
+          <button class="nav-btn" onclick="prevMonth()" title="Previous Month">◀</button>
+          <div class="card-title" id="monthYear">OCTOBER 2026</div>
+          <button class="nav-btn" onclick="nextMonth()" title="Next Month">▶</button>
+        </div>
+
+        <div class="card-body">
+          <table id="calendar"></table>
+        </div>
+
+        <div class="card-footer">
+          <div id="streakDisplay">🔥 Streak: 0 days</div>
+          <div class="calendar-legend">
+            <span class="legend-dot" title="5 habits finished"><span class="dot dot-green"></span> 5</span>
+            <span class="legend-dot" title="6-7 habits finished"><span class="dot dot-orange"></span> 6-7</span>
+            <span class="legend-dot" title="8+ habits finished"><span class="dot dot-blue"></span> 8+</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📝 RIGHT SIDE: LEVEL-BASED HABIT CHECKLIST -->
+      <div class="card checklist-card">
+        <div class="card-header">
+          <div class="checklist-nav-header">
+            <button class="nav-btn" onclick="prevLevel()" title="Previous Level">◀</button>
+            <div class="level-title-container">
+              <span class="level-badge" id="levelBadge">Lv. 1</span>
+              <span class="level-name-text" id="levelNameText">Taking the first steps</span>
+              <span id="levelInfoWrap"></span>
+            </div>
+            <button class="nav-btn" onclick="nextLevel()" title="Next Level">▶</button>
+          </div>
+        </div>
+
+        <div class="progress-subbar">
+          <span class="checklist-progress-text" id="progressText">0/5 Done (0%)</span>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="card-body checklist-body">
+          <ul class="habit-list" id="habitList">
+            <!-- Habit items injected by JS -->
+          </ul>
+        </div>
+
+        <div class="card-footer checklist-footer">
+          <form id="addHabitForm" onsubmit="addTask(event)">
+            <input type="text" id="newHabitInput" placeholder="Add custom habit to this level..." autocomplete="off">
+            <button type="submit" class="add-btn" title="Add Task">+</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="homepage.js"></script>
+</body>
+</html>

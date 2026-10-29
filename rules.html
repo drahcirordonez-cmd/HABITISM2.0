@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HABITISM - Commitment Contract & Rules</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1.5rem;
+      background-color: var(--bg-dark);
+      overflow-y: auto;
+    }
+
+    .rules-card {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 680px;
+      background: rgba(18, 14, 38, 0.85);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(147, 51, 234, 0.2);
+      border-radius: 24px;
+      padding: clamp(1.8rem, 4vw, 2.8rem);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      color: var(--text-main);
+      animation: fadeInScale 0.5s ease-out;
+    }
+
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.96) translateY(12px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .contract-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 1rem;
+      border-radius: 9999px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #f87171;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+    }
+
+    .rules-header h1 {
+      font-size: clamp(1.75rem, 3.2vw, 2.3rem);
+      font-weight: 800;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #ffffff 40%, var(--accent-lavender) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.6rem;
+    }
+
+    .rules-header p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .contract-body {
+      margin-top: 1.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .policy-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1.25rem 1.4rem;
+      transition: all 0.25s ease;
+    }
+
+    .policy-box:hover {
+      border-color: rgba(168, 85, 247, 0.4);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .policy-box.highlight-fb {
+      border-color: rgba(59, 130, 246, 0.4);
+      background: rgba(59, 130, 246, 0.06);
+    }
+
+    .policy-title {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 0.4rem;
+    }
+
+    .policy-desc {
+      font-size: 0.9rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    .quote-warning {
+      margin-top: 0.6rem;
+      padding: 0.6rem 0.9rem;
+      background: rgba(0, 0, 0, 0.35);
+      border-left: 3px solid #f97316;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #fed7aa;
+    }
+
+    .pledge-list {
+      margin-top: 1.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .pledge-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pledge-item input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      margin-top: 2px;
+      border-radius: 6px;
+      border: 2px solid rgba(168, 85, 247, 0.5);
+      background: rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      display: grid;
+      place-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .pledge-item input[type="checkbox"]:checked {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border-color: #34d399;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+    }
+
+    .pledge-item input[type="checkbox"]:checked::before {
+      content: "✔";
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .pledge-label {
+      font-size: 0.92rem;
+      color: #e2e8f0;
+      line-height: 1.45;
+    }
+
+    .rules-actions {
+      margin-top: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .btn-commit {
+      width: 100%;
+      padding: 1rem;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, #9333ea 0%, #6366f1 100%);
+      color: #ffffff;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(147, 51, 234, 0.45);
+      transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+    }
+
+    .btn-commit:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+      filter: grayscale(0.8);
+    }
+
+    .btn-commit:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(147, 51, 234, 0.65);
+      filter: brightness(1.1);
+    }
+
+    .btn-secondary-link {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      cursor: pointer;
+      text-align: center;
+      transition: color 0.2s ease;
+      padding: 0.4rem;
+    }
+
+    .btn-secondary-link:hover {
+      color: #f87171;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient starry background -->
+  <div class="night"></div>
+
+  <div class="rules-card">
+    <div class="contract-badge">
+      <span>⚖️</span>
+      <span>Discipline & Accountability Policy</span>
+    </div>
+
+    <div class="rules-header">
+      <h1>The Habitism Commitment</h1>
+      <p id="welcomeUserGreeting">Welcome to your transformation journey. Habitism is built on real accountability.</p>
+    </div>
+
+    <div class="contract-body">
+      <!-- Rule 1: Facebook Public Accountability -->
+      <div class="policy-box highlight-fb">
+        <div class="policy-title">
+          <span>📢</span>
+          <span>Facebook Social Accountability Guarantee</span>
+        </div>
+        <div class="policy-desc">
+          If you fail to accomplish your daily habits before midnight (11:59 PM), our backend triggers an automated Facebook Graph API post directly to the <strong>Habitism</strong> public accountability timeline:
+        </div>
+        <div class="quote-warning">
+          &ldquo;This person made this commitment but did not complete it.&rdquo;
+        </div>
+      </div>
+
+      <!-- Rule 2: Daily Streak Reset & Penalties -->
+      <div class="policy-box">
+        <div class="policy-title">
+          <span>🔥</span>
+          <span>Daily Streak & Habit Thresholds</span>
+        </div>
+        <div class="policy-desc">
+          Finish at least <strong>5 habits</strong> daily to keep your streak glowing Green. Reaching <strong>6–7 habits</strong> upgrades your day to Orange, and <strong>8+ habits</strong> earns a glowing White-Blue halo. Missing your goal resets your streak to 0 days unless protected by a Streak Freeze.
+        </div>
+      </div>
+
+      <!-- Rule 3: Gamification & Living Companion -->
+      <div class="policy-box">
+        <div class="policy-title">
+          <span>🌱</span>
+          <span>Rewards, Shop & Living Companion</span>
+        </div>
+        <div class="policy-desc">
+          Every completed habit gives you <strong>🪙 Habit Coins</strong>. Use coins in the Shop to acquire <strong>❄️ Streak Freezes</strong> to protect yourself on chaotic days. Maintain a 7-day streak to evolve your companion from a Seed to a Radiant Bloom and unlock your printable <strong>Official Weekly Certificate</strong>!
+        </div>
+      </div>
+    </div>
+
+    <!-- Pledges / Checkboxes -->
+    <div class="pledge-list">
+      <label class="pledge-item">
+        <input type="checkbox" id="pledge1" onchange="validatePledges()">
+        <span class="pledge-label">I acknowledge the 11:59 PM daily deadline and accept the public Facebook accountability consequence if I break my word.</span>
+      </label>
+
+      <label class="pledge-item">
+        <input type="checkbox" id="pledge2" onchange="validatePledges()">
+        <span class="pledge-label">I pledge to check in daily, track my habits with honesty, and level up my discipline step by step.</span>
+      </label>
+    </div>
+
+    <div class="rules-actions">
+      <button class="btn-commit" id="commitBtn" disabled onclick="handleAcceptCommitment()">
+        <span>✍️ I Accept The Commitment • Enter Dashboard</span>
+      </button>
+      <button class="btn-secondary-link" onclick="Habitism.logout()">I am not ready yet (Log Out)</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Check auth; do not redirect to commitment from commitment page
+      const user = Habitism.requireAuth(false);
+      if (user) {
+        document.getElementById("welcomeUserGreeting").innerText = 
+          `Welcome, ${user.name || 'Champion'}. Habitism turns intentions into ironclad habits.`;
+        
+        // If already committed, they can go directly to dashboard if they want
+        if (user.committed) {
+          const btn = document.getElementById("commitBtn");
+          btn.disabled = false;
+          btn.innerHTML = `<span>🚀 You are Committed • Enter Dashboard</span>`;
+          document.getElementById("pledge1").checked = true;
+          document.getElementById("pledge2").checked = true;
+        }
+      }
+    });
+
+    function validatePledges() {
+      const p1 = document.getElementById("pledge1").checked;
+      const p2 = document.getElementById("pledge2").checked;
+      document.getElementById("commitBtn").disabled = !(p1 && p2);
+    }
+
+    async function handleAcceptCommitment() {
+      const btn = document.getElementById("commitBtn");
+      btn.disabled = true;
+      btn.innerText = "Securing Commitment...";
+      await Habitism.commitRules();
+    }
+  </script>
+</body>
+</html>
+

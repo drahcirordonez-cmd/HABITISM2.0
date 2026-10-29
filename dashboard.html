@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HABITISM - Dashboard & Daily Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+  <!-- Ambient starry background -->
+  <div class="night"></div>
+  <div class="ambient-glow"></div>
+
+  <!-- 🧭 Top Navigation Bar -->
+  <header class="navbar">
+    <a href="dashboard.html" class="brand-logo">
+      <div class="brand-icon">🌱</div>
+      <span>HABITISM</span>
+    </a>
+
+    <div class="nav-actions">
+      <!-- User profile & Facebook badge -->
+      <div class="stat-pill" title="Logged in user">
+        <span>👤</span>
+        <span id="navUserName">User</span>
+        <span id="fbBadge" style="display:none; color: #60a5fa; font-size: 0.72rem; margin-left: 2px;">✔ FB</span>
+      </div>
+
+      <!-- Coins stat (opens shop) -->
+      <button class="stat-pill coins" onclick="openShopModal()" title="Habit Coins - Click to visit Shop">
+        <span>🪙</span>
+        <span id="navCoins">0</span>
+      </button>
+
+      <!-- Streak Freeze stat (opens shop) -->
+      <button class="stat-pill freeze" onclick="openShopModal()" title="Streak Freezes - Click to visit Shop">
+        <span>❄️</span>
+        <span id="navFreezes">0</span>
+      </button>
+
+      <!-- Living Companion Widget (opens modal) -->
+      <div class="companion-widget" onclick="openCompanionModal()" title="Living Habit Companion">
+        <span class="companion-avatar" id="navCompanionIcon">🌱</span>
+        <div class="companion-info">
+          <span class="companion-name" id="navCompanionStage">Sprout</span>
+          <span class="companion-stage">Click to View</span>
+        </div>
+      </div>
+
+      <!-- Weekly Certificate Button -->
+      <button class="nav-btn-link btn-secondary" onclick="openCertificateModal()" title="Weekly Streak Certificate">
+        <span>🏆</span>
+        <span>Certificate</span>
+      </button>
+
+      <!-- Task Mode Switcher (Option A vs Option B) -->
+      <button class="nav-btn-link btn-secondary" onclick="openTaskModeModal()" title="Switch between 5 Custom Habits and Developer Levels">
+        <span>⚙️</span>
+        <span>Mode</span>
+      </button>
+
+      <!-- Accountability / Facebook Status -->
+      <button class="nav-btn-link btn-secondary" onclick="openAccountabilityModal()" title="Facebook Graph API Commitment Status">
+        <span>📢</span>
+        <span>Accountability</span>
+      </button>
+
+      <!-- Prominent Visible Log Out Button -->
+      <button class="nav-btn-link btn-logout" onclick="Habitism.logout()" title="Safely log out of your session">
+        <span>🚪</span>
+        <span>Log Out</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 📦 Main Above-The-Fold Side-by-Side Content Area -->
+  <main class="dashboard-main">
+
+    <div class="dashboard-header">
+      <h1>HABIT TRACKER</h1>
+      <p>Keep your daily habits blooming every day</p>
+    </div>
+
+    <!-- Side-by-Side: Equal Dimensions, Above The Fold -->
+    <div class="content-row">
+
+      <!-- 📅 LEFT SIDE: CALENDAR -->
+      <div class="dash-card calendar-card">
+        <div class="card-header">
+          <button class="nav-btn" onclick="prevMonth()" title="Previous Month">◀</button>
+          <div class="card-title" id="monthYear">OCTOBER 2026</div>
+          <button class="nav-btn" onclick="nextMonth()" title="Next Month">▶</button>
+        </div>
+
+        <div class="card-body">
+          <table id="calendar"></table>
+        </div>
+
+        <div class="card-footer">
+          <div id="streakDisplay">🔥 Streak: 0 days</div>
+          <div class="calendar-legend">
+            <span class="legend-dot" title="5 habits finished"><span class="dot dot-green"></span> 5</span>
+            <span class="legend-dot" title="6-7 habits finished"><span class="dot dot-orange"></span> 6-7</span>
+            <span class="legend-dot" title="8+ habits finished"><span class="dot dot-blue"></span> 8+</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📝 RIGHT SIDE: LEVEL-BASED HABIT CHECKLIST -->
+      <div class="dash-card checklist-card">
+        <div class="card-header">
+          <div class="checklist-nav-header">
+            <button class="nav-btn" id="prevLevelBtn" onclick="prevLevel()" title="Previous Level">◀</button>
+            <div class="level-title-container">
+              <span class="level-badge" id="levelBadge">Lv. 1</span>
+              <span class="level-name-text" id="levelNameText">Taking the first steps</span>
+              <span id="levelInfoWrap"></span>
+            </div>
+            <button class="nav-btn" id="nextLevelBtn" onclick="nextLevel()" title="Next Level">▶</button>
+          </div>
+        </div>
+
+        <div class="progress-subbar">
+          <span class="checklist-progress-text" id="progressText">0/5 Done (0%)</span>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="card-body checklist-body">
+          <ul class="habit-list" id="habitList">
+            <!-- Habit items injected dynamically -->
+          </ul>
+        </div>
+
+        <div class="card-footer checklist-footer">
+          <form id="addHabitForm" onsubmit="addTask(event)">
+            <input type="text" id="newHabitInput" placeholder="Add custom habit to this list..." autocomplete="off">
+            <button type="submit" class="add-btn" title="Add Task">+</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- =========================================================================
+       MODALS SYSTEM
+       ========================================================================= -->
+
+  <!-- 1. Task Mode Choice Modal (Option A vs Option B) -->
+  <div class="modal-overlay" id="taskModeModal">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal('taskModeModal')">&times;</button>
+      <div class="modal-title">Choose Daily Task Mode</div>
+      <div class="modal-subtitle">Pick how you want to challenge yourself today:</div>
+
+      <div class="task-choice-grid">
+        <div class="task-choice-card" id="cardOptionA" onclick="selectTaskMode('custom')">
+          <div class="task-choice-icon">🎯</div>
+          <div class="task-choice-title">Option A: 5 Custom Tasks</div>
+          <div class="task-choice-desc">Create your own tailored daily routine (Push-ups, Meditation, etc.)</div>
+        </div>
+
+        <div class="task-choice-card" id="cardOptionB" onclick="selectTaskMode('presets')">
+          <div class="task-choice-icon">⚡</div>
+          <div class="task-choice-title">Option B: Developer Levels</div>
+          <div class="task-choice-desc">Progress through curated habit levels designed to build discipline.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Reward Shop Modal -->
+  <div class="modal-overlay" id="shopModal">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal('shopModal')">&times;</button>
+      <div class="modal-title">🛍️ Habit Reward Shop</div>
+      <div class="modal-subtitle">Spend coins earned by completing your daily habits!</div>
+
+      <div style="margin-bottom: 15px; font-size: 0.95rem; color: #fde68a;">
+        Your Balance: 🪙 <strong id="shopUserCoins">0</strong> Habit Coins
+      </div>
+
+      <div class="shop-grid">
+        <div class="shop-item">
+          <div class="shop-item-left">
+            <div class="shop-item-icon">❄️</div>
+            <div>
+              <div class="shop-item-title">Streak Freeze</div>
+              <div class="shop-item-desc">Shields your streak from resetting if you miss a day.</div>
+            </div>
+          </div>
+          <button class="nav-btn-link btn-primary" onclick="handleBuyFreeze()">
+            <span>Buy 50 🪙</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Living Companion Modal -->
+  <div class="modal-overlay" id="companionModal">
+    <div class="modal-card" style="text-align: center;">
+      <button class="modal-close" onclick="closeModal('companionModal')">&times;</button>
+      <div class="modal-title">🌱 Your Living Companion</div>
+      <div class="modal-subtitle">Your companion blooms as you maintain your daily streaks!</div>
+
+      <div style="font-size: 4.5rem; margin: 15px 0;" id="modalCompIcon">🌱</div>
+      <h3 style="color: #6ee7b7; font-size: 1.4rem; margin-bottom: 4px;" id="modalCompName">Young Sprout</h3>
+      <p style="color: var(--text-muted); font-size: 0.88rem;" id="modalCompStage">Stage 2</p>
+
+      <div style="margin: 20px 0; background: rgba(255,255,255,0.05); padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; font-size: 0.84rem; margin-bottom: 6px;">
+          <span>Current Streak: <strong id="modalCompStreak" style="color:#ffffff;">0 Days</strong></span>
+          <span id="companionMilestoneText" style="color: var(--accent-violet);">Milestone Progress</span>
+        </div>
+        <div class="progress-bar-container" style="height: 8px;">
+          <div class="progress-bar-fill" id="companionMilestoneBar" style="width: 25%;"></div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; font-size: 0.72rem; color: var(--text-muted);">
+        <div>🌰<br>Seed<br>(0d)</div>
+        <div>🌱<br>Sprout<br>(2d)</div>
+        <div>🌿<br>Stem<br>(4d)</div>
+        <div>🌸<br>Bloom<br>(7d)</div>
+        <div>🪷<br>Phoenix<br>(14d)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Weekly Certificate Modal -->
+  <div class="modal-overlay" id="certificateModal">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal('certificateModal')">&times;</button>
+      <div class="modal-title">🏆 Official Habitism Certificate</div>
+      <div id="certStatusNotice" style="font-size: 0.88rem; margin-bottom: 12px;"></div>
+
+      <div class="certificate-preview" id="printableCertificate">
+        <div class="certificate-header">Certificate of Mastery</div>
+        <div class="certificate-seal">🎖️</div>
+        <div class="certificate-text">This certifies that</div>
+        <div class="certificate-user" id="certUserName">Habit Champion</div>
+        <div class="certificate-text">
+          Has demonstrated unwavering discipline by successfully sustaining a <strong>7-Day Habit Streak</strong> under the strict Facebook Accountability Protocol.
+        </div>
+        <div style="margin-top: 18px; font-size: 0.78rem; color: #fde68a;">
+          Awarded on <span id="certDate">October 25, 2026</span> • Habitism Discipline Authority
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content: flex-end; gap: 10px;">
+        <button class="nav-btn-link btn-secondary" onclick="closeModal('certificateModal')">Close</button>
+        <button class="nav-btn-link btn-primary" id="printCertBtn" onclick="window.print()">
+          <span>🖨️ Print / Save Certificate</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Facebook Accountability Status Modal -->
+  <div class="modal-overlay" id="accountabilityModal">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal('accountabilityModal')">&times;</button>
+      <div class="modal-title">📢 Facebook Social Accountability</div>
+      <div class="modal-subtitle">Habitism backend monitors your progress before the 11:59 PM deadline.</div>
+
+      <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 14px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.88rem; line-height: 1.5;">
+        <div><strong>Connected Page:</strong> Habitism</div>
+        <div><strong>Page ID:</strong> <code style="color: #60a5fa;">1496888330165860</code></div>
+        <div><strong>Policy Consequence:</strong> Automated Graph API post on unfulfilled daily habits:</div>
+        <div style="margin-top: 6px; padding: 6px 10px; background: rgba(0,0,0,0.3); border-left: 3px solid #f97316; font-family: monospace; font-size: 0.82rem; color: #fed7aa;">
+          &ldquo;This person made this commitment but did not complete it.&rdquo;
+        </div>
+      </div>
+
+      <button class="nav-btn-link btn-primary" style="width: 100%; justify-content: center; padding: 11px;" onclick="handleTestAccountabilityPost()">
+        <span>🧪 Test Graph API Accountability Check</span>
+      </button>
+
+      <div id="accountabilityLog" style="margin-top: 14px; font-size: 0.82rem; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); min-height: 48px;">
+        <span style="color: var(--text-muted);">Click above to test backend Graph API integration live.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dynamic Toast Notification -->
+  <div id="habitToast" class="habit-toast">✨ Habit Completed!</div>
+
+  <script src="app.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
+
