@@ -2,111 +2,187 @@
  * ============================================================================
  * HABITISM - DASHBOARD LOGIC (dashboard.js)
  * ============================================================================
- * Handles Side-by-Side Calendar, Level Habits & Custom Tasks, Dynamic Color Themes,
- * Gamification (Coins, Shop, Freezes, Companion, Certificate), and Facebook Accountability.
+ * Handles Multi-User State Isolation, Calendar, Level Habits (6, 7, 8 tasks),
+ * Dynamic Tiers & Containers, Rewards, Unclipped Global Tooltips & Facebook Integration.
  */
 
-// Preset developer levels with info buttons
+// ============================================================================
+// 🌟 DEVELOPER LEVELS (Curated default habits with rich helpful tooltips)
+// ============================================================================
 const DEVELOPER_LEVELS = [
   {
     id: 1,
     title: "Level 1: Taking the first steps",
-    info: "baby steps (note, it may seem very easy, but, keep in mind that this is where you begin)",
+    info: "baby steps (note: it may seem very easy, but keep in mind this is where foundational momentum begins)",
     tasks: [
-      { text: "don't use your phone for 1 minute" },
-      { text: "close your eyes for 1-minute and take deep breaths" },
-      { text: "do 1 push up" },
-      { text: "do 1 jumping jack" },
-      { text: "Think of one thing to be thankful for" }
+      { 
+        text: "don't use your phone for 1 minute", 
+        info: "Builds initial impulse control by breaking automatic smartphone reach habits" 
+      },
+      { 
+        text: "close your eyes for 1-minute and take deep breaths", 
+        info: "Resets neurological baseline arousal and lowers physical heart rate" 
+      },
+      { 
+        text: "do 1 push up", 
+        info: "Destroys physical inertia with zero friction, proving to yourself that action is effortless" 
+      },
+      { 
+        text: "do 1 jumping jack", 
+        info: "Activates blood circulation through the body to shake off lethargy" 
+      },
+      { 
+        text: "Think of one thing to be thankful for", 
+        info: "Neurochemically shifts attention from anxiety to gratitude" 
+      }
     ]
   },
   {
     id: 2,
     title: "Level 2: Let's keep it up",
-    info: null,
+    info: "Stepping up the rhythm while locking in daily consistency",
     tasks: [
-      { text: "don't use your phone for 2 minutes" },
-      { text: "close your eyes for 1-minute and take deep breaths" },
-      { text: "do 2 push ups" },
-      { text: "do 3 jumping jacks" },
+      { 
+        text: "don't use your phone for 2 minutes", 
+        info: "Doubles your conscious resistance against quick dopamine triggers" 
+      },
+      { 
+        text: "close your eyes for 1-minute and take deep breaths", 
+        info: "Stimulates vagal tone for calmer emotional responses under pressure" 
+      },
+      { 
+        text: "do 2 push ups", 
+        info: "Gently compounds strength while maintaining micro-habit momentum" 
+      },
+      { 
+        text: "do 3 jumping jacks", 
+        info: "Oxygenates blood flow to energize your physical state" 
+      },
       { 
         text: "Think of 2 things to be thankful for", 
-        info: "example your mom/cousin/pet for being there for you" 
+        info: "Example: your family, cousin, or pet for being there for you" 
       }
     ]
   },
   {
     id: 3,
     title: "Level 3: Keep moving forward with me",
-    info: null,
+    info: "Accelerating physical alertness and mental clarity (6 tasks)",
     tasks: [
-      { text: "don't use your phone for 3 minutes" },
-      { text: "close your eyes for 1-minute and take deep breaths" },
-      { text: "do 3 push ups" },
-      { text: "do 5 jumping jacks" },
+      { 
+        text: "don't use your phone for 3 minutes", 
+        info: "Expands your conscious attention span and blocks reflex checking" 
+      },
+      { 
+        text: "close your eyes for 1-minute and take deep breaths", 
+        info: "Deep diaphragmatic breathing lowers cortisol and clears mental fog" 
+      },
+      { 
+        text: "do 3 push ups", 
+        info: "Quick isometric activation pumps oxygenated blood directly to the brain" 
+      },
+      { 
+        text: "do 5 jumping jacks", 
+        info: "Engages cardiovascular rhythm and shakes off physical stiffness" 
+      },
       { 
         text: "Think of 3 things to be thankful for", 
-        info: "example your friend for being there for you" 
+        info: "Example: a loyal friend, a good book, or a warm meal" 
+      },
+      { 
+        text: "Drink a large glass of clean water", 
+        info: "Rehydrates brain cells, boosts metabolic speed, and primes physical focus" 
       }
     ]
   },
   {
     id: 4,
     title: "Level 4: Try something new with me | Meditation",
-    info: "improves sleep, calms the mind • best when quiet",
+    info: "Improves sleep, calms the mind • best when quiet (7 tasks)",
     tasks: [
-      { text: "set a 5 minute timer" },
+      { 
+        text: "set a 5 minute timer", 
+        info: "A fixed container keeps your mind from wandering to clock-watching" 
+      },
       { 
         text: "believe in yourself and close your eyes for 5mins", 
-        info: "if you can't close your eyes, you can open your eyes and simply focus your attention to one point/item." 
+        info: "If you cannot close your eyes, simply soften your gaze and focus attention on one point" 
       },
       { 
         text: "take deep breaths", 
-        info: "deep inhale, exhale slowly" 
+        info: "Deep inhale through nose, slow extended exhale through mouth" 
       },
-      { text: "keep your focus on your deep breaths" },
-      { text: "Trust the process" }
+      { 
+        text: "keep your focus on your deep breaths", 
+        info: "Anchoring your mind to the breath trains your prefrontal cortex to resist distractions" 
+      },
+      { 
+        text: "Trust the process", 
+        info: "Mind wandering is completely natural; gently returning your focus builds mental resilience" 
+      },
+      { 
+        text: "Gently scan your body from head to toe", 
+        info: "Identifies and consciously releases subconscious tension stored in shoulders, jaw, and neck" 
+      },
+      { 
+        text: "Notice one distracting thought and let it float away", 
+        info: "Cultivates non-reactive detachment, training emotional control during daily stress" 
+      }
     ]
   },
   {
     id: 5,
     title: "Level 5: Prime your environment",
-    info: "Make good habits easy and bad habits hard to do",
+    info: "Make good habits easy and bad habits hard to do (8 tasks)",
     tasks: [
       { 
         text: "give your phone to someone and let them keep/hide it for 5 minutes", 
-        info: "helps to avoid doom-scrolling/getting distracted from using your phone" 
+        info: "Physical distance destroys the habitual reflex loop of mindless doom-scrolling" 
       },
       { 
         text: "make your bed", 
-        info: "Makes you avoid lying down and helps you turn your attention to doing something more productive" 
+        info: "Creates an immediate visual victory and psychologically discourages crawling back under the covers" 
       },
       { 
         text: "Remove things that doesn't belong to the floor", 
-        info: "Avoids distractions and makes it easier to do more productive tasks" 
+        info: "Eliminates visual chaos, which measurably reduces subconscious cognitive load" 
       },
       { 
         text: "Place your study materials on your desk", 
-        info: "helps with making you more likely to study" 
+        info: "Lowers friction and activation energy, making it vastly easier to initiate work" 
       },
       { 
         text: "Prepare tomorrow's to-do list", 
-        info: "conditions you to be productive tomorrow" 
+        info: "Offloads working memory so you wake up with absolute clarity and purpose" 
+      },
+      { 
+        text: "Place a filled water bottle on your workstation", 
+        info: "Keeps essential hydration within arm's reach so you remain mentally sharp without getting up" 
+      },
+      { 
+        text: "Mute all non-critical notifications on devices", 
+        info: "Protects deep workflow states from intrusive dopamine-driven pings and rings" 
+      },
+      { 
+        text: "Clear and wipe down your primary tabletop surface", 
+        info: "A sanitized, pristine surface signals psychological readiness to begin serious work" 
       }
     ]
   }
 ];
 
-// Option A: Default Starter 5 Custom Tasks
+// Option A: Starter Custom Tasks
 const DEFAULT_OPTION_A_TASKS = [
-  { text: "Morning Meditation (5 mins)" },
-  { text: "Do 20 Push-ups" },
-  { text: "Do 10 Pull-ups" },
-  { text: "Do 25 Sit-ups" },
-  { text: "Deep breathing & Gratitude reflection" }
+  { text: "Morning Meditation (5 mins)", info: "Centering mental attention before beginning work" },
+  { text: "Do 20 Push-ups", info: "Boosts physical strength and upper body endurance" },
+  { text: "Do 10 Pull-ups", info: "Engages back and posterior chain muscles" },
+  { text: "Do 25 Sit-ups", info: "Core conditioning to support proper posture" },
+  { text: "Deep breathing & Gratitude reflection", info: "Calms nervous system and centers your day" }
 ];
 
-// State Variables
+// ============================================================================
+// 🔒 MULTI-USER ISOLATION STORAGE HELPERS
+// ============================================================================
 let currentUser = null;
 let currentCalendarDate = new Date();
 let currentLevelIndex = 0;
@@ -116,19 +192,38 @@ function getTodayString() {
   return new Date().toDateString();
 }
 
+function userKey(key) {
+  return Habitism.getUserKey(key, currentUser);
+}
+
 // -------------------------------------------------------------
 // 📅 PART 1: CALENDAR LOGIC (TIER GREEN, ORANGE, WHITE-BLUE)
 // -------------------------------------------------------------
 function getDayCompletedCount(dateString) {
-  const count = localStorage.getItem("cal_tier_" + dateString);
+  const count = localStorage.getItem(userKey("cal_tier_" + dateString));
   return count ? parseInt(count, 10) : 0;
 }
 
 function setDayCompletedCount(dateString, count) {
+  const k = userKey("cal_tier_" + dateString);
   if (count <= 0) {
-    localStorage.removeItem("cal_tier_" + dateString);
+    localStorage.removeItem(k);
   } else {
-    localStorage.setItem("cal_tier_" + dateString, count.toString());
+    localStorage.setItem(k, count.toString());
+  }
+
+  // Sync to database
+  if (currentUser && currentUser.id) {
+    fetch(`${Habitism.API_BASE}/api/habits/save-day`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        dateStr: dateString,
+        completedCount: count,
+        totalCount: getActiveTasks().length
+      })
+    }).catch(() => {});
   }
 }
 
@@ -139,7 +234,6 @@ function renderCalendar(date) {
   const year = date.getFullYear();
   const month = date.getMonth();
 
-  // Update Month Title
   const monthYearEl = document.getElementById("monthYear");
   if (monthYearEl) {
     monthYearEl.innerText = date.toLocaleString("default", { month: "long" }).toUpperCase() + " " + year;
@@ -168,7 +262,7 @@ function renderCalendar(date) {
 
     const completedCount = getDayCompletedCount(cellDate);
 
-    // 🌟 Highlights:
+    // Dynamic Calendar Highlight Tiers:
     // 8+ -> bright white-blue
     // 6-7 -> bright orange
     // 5 -> green
@@ -243,10 +337,10 @@ function nextMonth() {
 }
 
 // -------------------------------------------------------------
-// 📝 PART 2: CHECKLIST LOGIC (OPTION A & OPTION B)
+// 📝 PART 2: CHECKLIST LOGIC (OPTION A & OPTION B, ISOLATED PER USER)
 // -------------------------------------------------------------
 function loadCurrentLevelIndex() {
-  const saved = localStorage.getItem("habitism_active_level");
+  const saved = localStorage.getItem(userKey("active_level"));
   if (saved !== null) {
     const idx = parseInt(saved, 10);
     if (!isNaN(idx) && idx >= 0 && idx < DEVELOPER_LEVELS.length) {
@@ -256,12 +350,12 @@ function loadCurrentLevelIndex() {
 }
 
 function saveCurrentLevelIndex() {
-  localStorage.setItem("habitism_active_level", currentLevelIndex.toString());
+  localStorage.setItem(userKey("active_level"), currentLevelIndex.toString());
 }
 
 function getActiveTasks() {
   if (activeTaskMode === "custom") {
-    const saved = localStorage.getItem("habitism_custom_tasks");
+    const saved = localStorage.getItem(userKey("custom_tasks"));
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
@@ -269,7 +363,7 @@ function getActiveTasks() {
   } else {
     // Option B: Presets
     const level = DEVELOPER_LEVELS[currentLevelIndex];
-    const key = `habitism_tasks_lvl_${level.id}`;
+    const key = userKey(`tasks_lvl_${level.id}`);
     const saved = localStorage.getItem(key);
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
@@ -280,17 +374,17 @@ function getActiveTasks() {
 
 function saveActiveTasks(tasks) {
   if (activeTaskMode === "custom") {
-    localStorage.setItem("habitism_custom_tasks", JSON.stringify(tasks));
+    localStorage.setItem(userKey("custom_tasks"), JSON.stringify(tasks));
   } else {
     const level = DEVELOPER_LEVELS[currentLevelIndex];
-    localStorage.setItem(`habitism_tasks_lvl_${level.id}`, JSON.stringify(tasks));
+    localStorage.setItem(userKey(`tasks_lvl_${level.id}`), JSON.stringify(tasks));
   }
 }
 
 function getActiveChecks() {
   const todayKey = activeTaskMode === "custom" 
-    ? `habitism_custom_checks_${getTodayString()}`
-    : `habitism_checks_${DEVELOPER_LEVELS[currentLevelIndex].id}_${getTodayString()}`;
+    ? userKey(`custom_checks_${getTodayString()}`)
+    : userKey(`checks_${DEVELOPER_LEVELS[currentLevelIndex].id}_${getTodayString()}`);
 
   const saved = localStorage.getItem(todayKey);
   if (saved) {
@@ -301,8 +395,8 @@ function getActiveChecks() {
 
 function saveActiveChecks(checks) {
   const todayKey = activeTaskMode === "custom" 
-    ? `habitism_custom_checks_${getTodayString()}`
-    : `habitism_checks_${DEVELOPER_LEVELS[currentLevelIndex].id}_${getTodayString()}`;
+    ? userKey(`custom_checks_${getTodayString()}`)
+    : userKey(`checks_${DEVELOPER_LEVELS[currentLevelIndex].id}_${getTodayString()}`);
 
   localStorage.setItem(todayKey, JSON.stringify(checks));
 }
@@ -337,10 +431,7 @@ function renderChecklist() {
     if (levelNameEl) levelNameEl.innerText = "My 5 Custom Habits";
     if (levelInfoWrap) {
       levelInfoWrap.innerHTML = `
-        <button class="info-btn" aria-label="Custom Tasks Info" tabindex="0">
-          i
-          <span class="tooltip-popup">Your personalized daily routine. Strive for 5+ habits to sustain your streak!</span>
-        </button>
+        <button class="info-btn" data-info="Your personalized daily routine. Strive for 5+ habits to sustain your streak!" aria-label="Custom Tasks Info" tabindex="0">i</button>
       `;
     }
     if (prevBtn) prevBtn.style.visibility = "hidden";
@@ -354,10 +445,7 @@ function renderChecklist() {
     if (levelInfoWrap) {
       if (level.info) {
         levelInfoWrap.innerHTML = `
-          <button class="info-btn" aria-label="Level Info" tabindex="0">
-            i
-            <span class="tooltip-popup">${escapeHtml(level.info)}</span>
-          </button>
+          <button class="info-btn" data-info="${escapeHtml(level.info)}" aria-label="Level Info" tabindex="0">i</button>
         `;
       } else {
         levelInfoWrap.innerHTML = "";
@@ -365,7 +453,7 @@ function renderChecklist() {
     }
   }
 
-  // 3. Render Task Items
+  // 3. Render Task Items (Each with single unclipped info button)
   const listEl = document.getElementById("habitList");
   listEl.innerHTML = "";
   let completedToday = 0;
@@ -380,10 +468,7 @@ function renderChecklist() {
     let infoBtnHtml = "";
     if (task.info) {
       infoBtnHtml = `
-        <button class="info-btn" onclick="event.stopPropagation()" aria-label="Info">
-          i
-          <span class="tooltip-popup">${escapeHtml(task.info)}</span>
-        </button>
+        <button class="info-btn" data-info="${escapeHtml(task.info)}" onclick="event.stopPropagation()" aria-label="Info" tabindex="0">i</button>
       `;
     }
 
@@ -417,10 +502,10 @@ function renderChecklist() {
     progressBarFill.style.width = `${percent}%`;
   }
 
-  // 5. DYNAMIC CHECKBOX COLORING (BASED ON CHECKED BOXES COUNT)
+  // 5. Dynamic Checkbox Coloring:
   // 6-7 checked boxes -> bright orange checks
   // 8+ checked boxes -> bright white-blue checks
-  // 1-5 checked boxes -> default green checks
+  // 1-5 checked boxes -> green checks
   checklistCard.classList.remove("checks-orange", "checks-white-blue");
   if (completedToday >= 8) {
     checklistCard.classList.add("checks-white-blue");
@@ -428,7 +513,7 @@ function renderChecklist() {
     checklistCard.classList.add("checks-orange");
   }
 
-  // 6. UPDATE CALENDAR TIER FOR TODAY AUTOMATICALLY
+  // 6. Update Calendar Tier for Today
   setDayCompletedCount(getTodayString(), completedToday);
   renderCalendar(currentCalendarDate);
 }
@@ -456,7 +541,7 @@ function addTask(event) {
   if (!text) return;
 
   const tasks = getActiveTasks();
-  tasks.push({ text: text });
+  tasks.push({ text: text, info: "Custom habit added by you" });
   saveActiveTasks(tasks);
 
   input.value = "";
@@ -518,13 +603,26 @@ function updateNavbarBadges() {
   const companionStageEl = document.getElementById("navCompanionStage");
   const companionIconEl = document.getElementById("navCompanionIcon");
   const fbBadge = document.getElementById("fbBadge");
+  const adminBtn = document.getElementById("adminPortalBtn");
 
-  if (nameEl) nameEl.innerText = currentUser.name || "Champion";
+  if (nameEl) nameEl.innerText = currentUser.name || currentUser.username || "Champion";
   if (coinsEl) coinsEl.innerText = currentUser.coins || 0;
   if (freezeEl) freezeEl.innerText = currentUser.streak_freezes || 0;
 
+  // Show Admin Portal Button if role is admin
+  if (adminBtn) {
+    adminBtn.style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
+  }
+
+  // Facebook verification badge
   if (fbBadge) {
-    fbBadge.style.display = currentUser.facebook_id ? "inline-flex" : "none";
+    if (currentUser.facebook_id) {
+      fbBadge.style.display = "inline-flex";
+      fbBadge.innerText = currentUser.facebook_name ? `✔ FB: ${currentUser.facebook_name}` : "✔ FB";
+      fbBadge.title = `Linked with Facebook ID: ${currentUser.facebook_id}`;
+    } else {
+      fbBadge.style.display = "none";
+    }
   }
 
   const streak = currentUser.streak || 0;
@@ -581,7 +679,6 @@ function openCompanionModal() {
   document.getElementById("modalCompStage").innerText = comp.stage;
   document.getElementById("modalCompStreak").innerText = `${streak} Days`;
 
-  // Milestone target
   let nextTarget = 2;
   if (streak >= 14) nextTarget = 14;
   else if (streak >= 7) nextTarget = 14;
@@ -602,7 +699,7 @@ function openCertificateModal() {
   const streak = currentUser ? (currentUser.streak || 0) : 0;
   const isUnlocked = streak >= 7;
 
-  document.getElementById("certUserName").innerText = (currentUser && currentUser.name) ? currentUser.name : "Habit Champion";
+  document.getElementById("certUserName").innerText = (currentUser && (currentUser.name || currentUser.username)) ? (currentUser.name || currentUser.username) : "Habit Champion";
   document.getElementById("certDate").innerText = new Date().toLocaleDateString(undefined, { 
     year: 'numeric', month: 'long', day: 'numeric' 
   });
@@ -615,7 +712,7 @@ function openCertificateModal() {
     printBtn.disabled = false;
   } else {
     certStatus.innerHTML = `<span style="color: #fde68a;">🔒 Complete a full 7-day streak to officially claim (Current: ${streak}/7 days)</span>`;
-    printBtn.disabled = false; // Allow preview/print
+    printBtn.disabled = false;
   }
 
   openModal("certificateModal");
@@ -630,7 +727,7 @@ function openTaskModeModal() {
 
 function selectTaskMode(mode) {
   activeTaskMode = mode;
-  localStorage.setItem("habitism_task_mode", mode);
+  localStorage.setItem(userKey("task_mode"), mode);
   document.getElementById("cardOptionA").classList.toggle("selected", mode === "custom");
   document.getElementById("cardOptionB").classList.toggle("selected", mode === "presets");
   closeModal("taskModeModal");
@@ -640,7 +737,40 @@ function selectTaskMode(mode) {
 
 // Facebook Accountability Modal & Live Test
 function openAccountabilityModal() {
+  currentUser = Habitism.getCurrentUser();
+  const fbStatusDisplay = document.getElementById("fbAccountLinkStatus");
+  if (fbStatusDisplay) {
+    if (currentUser.facebook_id) {
+      fbStatusDisplay.innerHTML = `
+        <span style="color: #60a5fa; font-weight: 700;">Linked as: ${escapeHtml(currentUser.facebook_name || currentUser.name)} (ID: ${currentUser.facebook_id})</span>
+        <button class="nav-btn-link btn-secondary" style="margin-left: 10px; font-size: 0.76rem; padding: 3px 8px;" onclick="handleUnlinkFacebook()">Unlink</button>
+      `;
+    } else {
+      fbStatusDisplay.innerHTML = `
+        <span style="color: #94a3b8;">Not linked to Facebook.</span>
+        <button class="nav-btn-link btn-primary" style="margin-left: 10px; font-size: 0.76rem; padding: 3px 8px;" onclick="handleLinkFacebookPrompt()">Link Facebook Account</button>
+      `;
+    }
+  }
   openModal("accountabilityModal");
+}
+
+async function handleLinkFacebookPrompt() {
+  const fbName = prompt("Enter your Facebook profile name to link for social accountability:", currentUser.name || "Facebook Champion");
+  if (!fbName) return;
+  const fbId = "fb_" + Math.floor(100000 + Math.random() * 900000);
+  await Habitism.linkFacebook(currentUser.id, fbId, fbName);
+  updateNavbarBadges();
+  openAccountabilityModal();
+  showToast("✔ Facebook account linked successfully!");
+}
+
+async function handleUnlinkFacebook() {
+  if (!confirm("Are you sure you want to unlink Facebook?")) return;
+  await Habitism.unlinkFacebook(currentUser.id);
+  updateNavbarBadges();
+  openAccountabilityModal();
+  showToast("Facebook account unlinked.");
 }
 
 async function handleTestAccountabilityPost() {
@@ -658,7 +788,7 @@ async function handleTestAccountabilityPost() {
       logEl.innerHTML = `
         <div style="color: #f87171; font-weight: 700;">🚨 GRAPH API ACCOUNTABILITY TRIGGERED!</div>
         <div style="color: #fed7aa; margin-top: 4px;">&ldquo;This person made this commitment but did not complete it.&rdquo;</div>
-        <div style="color: #94a3b8; font-size: 0.76rem; margin-top: 4px;">Page: Habitism (ID: 1496888330165860) | Response: 200 OK</div>
+        <div style="color: #94a3b8; font-size: 0.76rem; margin-top: 4px;">User: ${currentUser.name} | Page: Habitism (ID: 1496888330165860) | Response: 200 OK</div>
       `;
     }
     updateStreak();
@@ -690,24 +820,168 @@ function escapeHtml(str) {
   );
 }
 
+// =============================================================
+// 🌟 UNCLIPPED GLOBAL FLOATING TOOLTIP ENGINE (NO DUPLICATES)
+// =============================================================
+let globalTooltipEl = null;
+
+function initGlobalTooltip() {
+  globalTooltipEl = document.getElementById("habitismGlobalTooltip");
+  if (!globalTooltipEl) {
+    globalTooltipEl = document.createElement("div");
+    globalTooltipEl.id = "habitismGlobalTooltip";
+    globalTooltipEl.className = "global-tooltip-popup";
+    document.body.appendChild(globalTooltipEl);
+  }
+
+  // Mouse Enter on any .info-btn
+  document.addEventListener("mouseenter", (e) => {
+    const btn = e.target.closest(".info-btn");
+    if (btn && btn.dataset.info) {
+      showGlobalTooltip(btn, btn.dataset.info);
+    }
+  }, true);
+
+  // Mouse Leave on any .info-btn
+  document.addEventListener("mouseleave", (e) => {
+    const btn = e.target.closest(".info-btn");
+    if (btn) {
+      hideGlobalTooltip();
+    }
+  }, true);
+
+  // Focus & Blur for keyboard accessibility
+  document.addEventListener("focusin", (e) => {
+    const btn = e.target.closest(".info-btn");
+    if (btn && btn.dataset.info) {
+      showGlobalTooltip(btn, btn.dataset.info);
+    }
+  }, true);
+
+  document.addEventListener("focusout", (e) => {
+    const btn = e.target.closest(".info-btn");
+    if (btn) {
+      hideGlobalTooltip();
+    }
+  }, true);
+
+  // Click & Mobile Tap support for info buttons.
+  // Capture phase: runs before inline handlers on nested action buttons
+  // (e.g. the habit toggle) so tapping an (i) button shows its tooltip on
+  // cellphones (where there is no hover) without triggering the parent action.
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".info-btn");
+    if (btn && btn.dataset.info) {
+      e.stopPropagation();
+      if (globalTooltipEl.classList.contains("active")) {
+        hideGlobalTooltip();
+      } else {
+        showGlobalTooltip(btn, btn.dataset.info);
+      }
+      return;
+    }
+    if (!e.target.closest("#habitismGlobalTooltip")) {
+      hideGlobalTooltip();
+    }
+  }, true);
+
+  // Hide on scroll
+  window.addEventListener("scroll", hideGlobalTooltip, true);
+}
+
+function showGlobalTooltip(targetBtn, text) {
+  if (!globalTooltipEl || !text) return;
+
+  globalTooltipEl.innerText = text;
+  globalTooltipEl.classList.remove("position-bottom");
+  globalTooltipEl.classList.add("active");
+
+  const btnRect = targetBtn.getBoundingClientRect();
+  const tipWidth = globalTooltipEl.offsetWidth;
+  const tipHeight = globalTooltipEl.offsetHeight;
+  const padding = 14;
+
+  let left = btnRect.left + (btnRect.width / 2) - (tipWidth / 2);
+  let arrowLeft = "50%";
+
+  if (left < padding) {
+    const diff = padding - left;
+    left = padding;
+    arrowLeft = `${Math.max(12, Math.min(88, 50 - (diff / tipWidth * 100)))}%`;
+  } else if (left + tipWidth > window.innerWidth - padding) {
+    const overflow = (left + tipWidth) - (window.innerWidth - padding);
+    left = window.innerWidth - padding - tipWidth;
+    arrowLeft = `${Math.max(12, Math.min(88, 50 + (overflow / tipWidth * 100)))}%`;
+  }
+
+  let top = btnRect.top - tipHeight - 10;
+  if (top < 18 || btnRect.top < 110) {
+    top = btnRect.bottom + 10;
+    globalTooltipEl.classList.add("position-bottom");
+  }
+
+  globalTooltipEl.style.left = `${Math.round(left)}px`;
+  globalTooltipEl.style.top = `${Math.round(top)}px`;
+  globalTooltipEl.style.setProperty("--arrow-left", arrowLeft);
+}
+
+function hideGlobalTooltip() {
+  if (globalTooltipEl) {
+    globalTooltipEl.classList.remove("active");
+  }
+}
+
 // -------------------------------------------------------------
 // 🚀 INITIALIZATION
 // -------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
-  // 1. Guard authentication and rules commitment
   currentUser = Habitism.requireAuth(true);
   if (!currentUser) return;
 
-  // 2. Load saved task mode
-  const savedMode = localStorage.getItem("habitism_task_mode");
+  // Load user-scoped task mode
+  const savedMode = localStorage.getItem(userKey("task_mode"));
   if (savedMode === "custom" || savedMode === "presets") {
     activeTaskMode = savedMode;
   }
 
-  // 3. Load Level & Setup
   loadCurrentLevelIndex();
+  initGlobalTooltip();
   updateNavbarBadges();
+
+  // 📱 Mobile navbar hamburger menu
+  const navToggle = document.getElementById("navMobileToggle");
+  const navMenu = document.getElementById("navActions");
+  const navOverlay = document.getElementById("navMobileOverlay");
+  const MOBILE_BREAKPOINT = 640;
+
+  if (navToggle && navMenu) {
+    function setMenu(open) {
+      navMenu.classList.toggle("open", !!open);
+      navToggle.setAttribute("aria-expanded", String(!!open));
+      if (navOverlay) navOverlay.classList.toggle("active", !!open);
+    }
+
+    navToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setMenu(!navMenu.classList.contains("open"));
+    });
+
+    // Close the menu when a menu item is activated
+    navMenu.addEventListener("click", () => setMenu(false));
+
+    // Close the menu when clicking outside of it
+    document.addEventListener("click", (e) => {
+      if (!navMenu.classList.contains("open")) return;
+      if (navToggle.contains(e.target) || navMenu.contains(e.target)) return;
+      setMenu(false);
+    });
+
+    // Reset the menu when resizing back to desktop
+    window.addEventListener("resize", () => {
+      if (window.innerWidth > MOBILE_BREAKPOINT) setMenu(false);
+    });
+  }
+
   renderCalendar(currentCalendarDate);
   renderChecklist();
 });
-

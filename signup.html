@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HABITISM • Create Your Account</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1.5rem;
+      background-color: var(--dark-bg, #010113);
+      color: #ffffff;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      overflow-y: auto;
+    }
+
+    .signup-card {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 480px;
+      background: rgba(18, 14, 38, 0.75);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      border-radius: 24px;
+      padding: clamp(1.8rem, 4vw, 2.4rem);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(147, 51, 234, 0.2);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      animation: fadeInScale 0.45s ease-out;
+    }
+
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.96) translateY(12px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      letter-spacing: 0.01em;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 11px 15px;
+      font-size: 0.95rem;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 11px;
+      outline: none;
+      transition: all 0.22s ease;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #9333ea 0%, #6366f1 100%);
+      border: none;
+      border-radius: 12px;
+      color: #ffffff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 18px rgba(147, 51, 234, 0.45);
+      transition: all 0.25s ease;
+      margin-top: 6px;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(147, 51, 234, 0.65);
+      filter: brightness(1.1);
+    }
+
+    .auth-error {
+      color: #f87171;
+      font-size: 0.85rem;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient background glow layers -->
+  <div class="night"></div>
+  <div class="ambient-glow"></div>
+
+  <div class="signup-card">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <a href="introduction-page.html" class="brand-logo" style="justify-content: center; margin-bottom: 8px;">
+        <div class="brand-icon">🌸</div>
+        <span style="font-size: 1.45rem;">HABITISM</span>
+      </a>
+      <h2 style="font-size: 1.5rem; font-weight: 800; margin: 4px 0; color: #ffffff;">Create Your Account</h2>
+      <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">Begin your journey to ironclad consistency</p>
+    </div>
+
+    <div class="auth-error" id="signupError"></div>
+
+    <form id="signupForm" onsubmit="handleSignupSubmit(event)">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="signupName" required placeholder="John Doe" autocomplete="name">
+      </div>
+
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="signupUsername" required placeholder="johndoe" autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="signupEmail" required placeholder="john@example.com" autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="signupPassword" required placeholder="At least 4 characters" minlength="4" autocomplete="new-password">
+      </div>
+
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="signupConfirmPassword" required placeholder="Repeat password" minlength="4" autocomplete="new-password">
+      </div>
+
+      <button type="submit" class="btn-submit" id="btnSignupText">Create My Account & Continue →</button>
+    </form>
+
+    <div style="margin-top: 18px; text-align: center; font-size: 0.88rem; color: var(--text-muted);">
+      Already have an account? 
+      <a href="login.html" style="color: #38bdf8; font-weight: 700; text-decoration: none;">Log In here</a>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    async function handleSignupSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById("signupName").value.trim();
+      const username = document.getElementById("signupUsername").value.trim();
+      const email = document.getElementById("signupEmail").value.trim();
+      const password = document.getElementById("signupPassword").value;
+      const confirmPassword = document.getElementById("signupConfirmPassword").value;
+      const errorEl = document.getElementById("signupError");
+      const btn = document.getElementById("btnSignupText");
+
+      errorEl.style.display = "none";
+
+      if (password !== confirmPassword) {
+        errorEl.innerText = "Passwords do not match. Please re-enter.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Creating Account...";
+
+      try {
+        const user = await Habitism.register(name, username, email, password);
+        // Successful registration -> proceed to Rules Commitment Contract
+        window.location.href = "rules.html";
+      } catch (err) {
+        errorEl.innerText = err.message || "Registration failed. Please try again.";
+        errorEl.style.display = "block";
+        btn.disabled = false;
+        btn.innerText = "Create My Account & Continue →";
+      }
+    }
+  </script>
+</body>
+</html>
+

@@ -102,6 +102,98 @@ body {
   gap: 12px;
 }
 
+/* 📱 Mobile navbar toggle (hamburger) */
+.nav-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  font-size: 1.4rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+.nav-mobile-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--accent-violet);
+}
+.nav-mobile-toggle:active {
+  transform: scale(0.95);
+}
+
+.nav-mobile-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 15;
+}
+
+/* On narrow screens, hide the navbar items behind a hamburger icon */
+@media (max-width: 640px) {
+  .navbar {
+    padding: 12px 18px;
+  }
+
+  .nav-mobile-toggle {
+    display: flex;
+  }
+
+  .nav-actions {
+    position: absolute;
+    top: 100%;
+    right: 16px;
+    width: min(250px, calc(100% - 32px));
+    margin-top: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px;
+    background: rgba(18, 14, 38, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: none;
+    z-index: 20;
+  }
+
+  .nav-actions.open {
+    display: flex;
+  }
+
+  .nav-actions .stat-pill,
+  .nav-actions .nav-btn-link,
+  .nav-actions .companion-widget {
+    width: 100%;
+    justify-content: center;
+    font-size: 0.9rem;
+  }
+
+  .nav-actions .stat-pill {
+    gap: 8px;
+  }
+
+  .nav-actions .stat-pill span,
+  .nav-actions .nav-btn-link span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+}
+
 /* Stat Badges in Navbar */
 .stat-pill {
   display: inline-flex;

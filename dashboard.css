@@ -369,9 +369,9 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  min-width: 0;
+  position: relative;
 }
 
 .level-badge {
@@ -383,6 +383,7 @@ body {
   border: 1px solid rgba(168, 85, 247, 0.4);
   color: #d8b4fe;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .level-name-text {
@@ -392,6 +393,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 220px;
 }
 
 /* Progress bar in checklist */
@@ -427,79 +429,93 @@ body {
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
 }
 
-/* ℹ️ INFORMATION (i) BUTTON & TOOLTIP */
+/* ℹ️ INFORMATION (i) BUTTON & TOOLTIPS (UNCLIPPED & HIGH CONTRAST) */
 .info-btn {
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
+  width: 17px;
+  height: 17px;
+  min-width: 17px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
-  font-size: 10px;
-  font-weight: 700;
-  font-family: serif;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.12);
+  color: #e0f2fe;
+  font-size: 10.5px;
+  font-weight: 800;
+  font-family: ui-serif, Georgia, serif;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 0;
-  margin-left: 4px;
+  margin-left: 5px;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.2);
 }
 
-.info-btn:hover {
-  background: rgba(168, 85, 247, 0.5);
+.info-btn:hover,
+.info-btn:focus-visible {
+  background: rgba(56, 189, 248, 0.35);
   color: #ffffff;
-  border-color: #c084fc;
-  box-shadow: 0 0 8px rgba(192, 132, 252, 0.7);
-  transform: scale(1.1);
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+  transform: scale(1.15);
+  outline: none;
 }
 
-.tooltip-popup {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 10, 30, 0.96);
-  border: 1px solid rgba(168, 85, 247, 0.5);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 10px rgba(168, 85, 247, 0.3);
-  backdrop-filter: blur(12px);
-  color: #f8fafc;
-  font-size: 0.76rem;
-  font-weight: 500;
-  font-family: inherit;
-  padding: 6px 10px;
-  border-radius: 8px;
-  white-space: normal;
-  width: max-content;
-  max-width: 250px;
-  line-height: 1.35;
+/* 🌟 GLOBAL UNCLIPPED FLOATING TOOLTIP PORTAL */
+.global-tooltip-popup {
+  position: fixed;
+  z-index: 99999;
   pointer-events: none;
+  background: rgba(10, 13, 28, 0.96);
+  border: 1px solid rgba(56, 189, 248, 0.65);
+  box-shadow: 
+    0 16px 36px rgba(0, 0, 0, 0.85), 
+    0 0 22px rgba(56, 189, 248, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #f8fafc;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.45;
+  padding: 8px 13px;
+  border-radius: 9px;
+  max-width: 310px;
+  width: max-content;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 1000;
-  text-align: left;
+  transform: translateY(4px) scale(0.96);
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.18s;
 }
 
-.tooltip-popup::after {
+.global-tooltip-popup.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.global-tooltip-popup::after {
   content: '';
   position: absolute;
   top: 100%;
-  left: 50%;
+  left: var(--arrow-left, 50%);
   transform: translateX(-50%);
-  border-width: 5px;
+  border-width: 6px;
   border-style: solid;
-  border-color: rgba(15, 10, 30, 0.96) transparent transparent transparent;
+  border-color: rgba(10, 13, 28, 0.96) transparent transparent transparent;
 }
 
-.info-btn:hover .tooltip-popup,
-.info-btn:focus .tooltip-popup {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(-2px);
+.global-tooltip-popup.position-bottom::after {
+  top: auto;
+  bottom: 100%;
+  border-color: transparent transparent rgba(10, 13, 28, 0.96) transparent;
+}
+
+/* Old inline .tooltip-popup: permanently hidden — global JS tooltip is sole mechanism */
+.tooltip-popup {
+  display: none !important;
 }
 
 /* Scrollable Habit List */

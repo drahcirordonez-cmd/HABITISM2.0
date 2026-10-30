@@ -4,95 +4,277 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HABITISM - Commitment Contract & Rules</title>
-  <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="app.css">
   <style>
-    body {
+    /* ==========================================================================
+       IMMERSIVE DEEP DARK SLATE CONTRACT BACKDROP
+       ========================================================================== */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
       min-height: 100vh;
+      background-color: #060713;
+      color: #f8fafc;
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 1.5rem;
-      background-color: var(--bg-dark);
+      overflow-x: hidden;
       overflow-y: auto;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      position: relative;
     }
 
+    /* Cohesive layered radial gradient background (No white split) */
+    .contract-backdrop {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+      background: 
+        radial-gradient(ellipse 90% 55% at 50% -10%, rgba(56, 189, 248, 0.16), transparent 70%),
+        radial-gradient(ellipse 70% 50% at 50% 110%, rgba(99, 102, 241, 0.18), transparent 70%),
+        radial-gradient(circle at 10% 45%, rgba(147, 51, 234, 0.1), transparent 50%),
+        radial-gradient(circle at 90% 55%, rgba(56, 189, 248, 0.1), transparent 50%),
+        linear-gradient(180deg, #05060f 0%, #090c1a 50%, #060713 100%);
+    }
+
+    
+    /* ==========================================================================
+       SUBTLE ENCIRCLED EXCLAMATION MARKS (Low Opacity, Big, Tilted Accents)
+       ========================================================================== */
+    .exclamation-watermarks-layer {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      overflow: hidden;
+    }
+
+    .exclamation-mark {
+      position: absolute;
+      width: clamp(230px, 24vw, 340px);
+      height: clamp(230px, 24vw, 340px);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .exclamation-mark svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      filter: drop-shadow(0 0 20px currentColor);
+    }
+
+    /* 1. Bluish-White Accent (Top Left) */
+    .mark-bluish-white {
+      top: 4%;
+      left: 2%;
+      color: #bae6fd;
+      opacity: 0.085;
+      transform: rotate(-24deg);
+    }
+
+    /* 2. Greenish Accent (Bottom Right) */
+    .mark-greenish {
+      bottom: 6%;
+      right: 3%;
+      color: #34d399;
+      opacity: 0.08;
+      transform: rotate(18deg);
+    }
+
+    /* 3. Reddish-Orange Accent (Mid Right) */
+    .mark-reddish-orange {
+      top: 46%;
+      right: 1%;
+      color: #fb923c;
+      opacity: 0.075;
+      transform: rotate(-16deg);
+    }
+
+    /* 4. Secondary Bluish Accent (Bottom Left) */
+    .mark-bluish-secondary {
+      bottom: 10%;
+      left: 2%;
+      color: #e0f2fe;
+      opacity: 0.065;
+      transform: rotate(26deg);
+    }
+
+    /* Subtle discipline grid texture */
+    .grid-pattern {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 50%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 50%, transparent 100%);
+    }
+
+    /* Ambient bluish-white glowing halo behind card */
+    .ambient-halo {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, rgba(99, 102, 241, 0.06) 45%, transparent 70%);
+      pointer-events: none;
+      z-index: 2;
+      filter: blur(40px);
+    }
+
+    /* ==========================================================================
+       RULES CONTRACT CARD
+       ========================================================================== */
     .rules-card {
       position: relative;
       z-index: 10;
       width: 100%;
-      max-width: 680px;
-      background: rgba(18, 14, 38, 0.85);
-      border: 1px solid rgba(168, 85, 247, 0.35);
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(147, 51, 234, 0.2);
-      border-radius: 24px;
+      max-width: 700px;
+      margin: 2.5rem 1.2rem;
+      background: rgba(11, 14, 30, 0.88);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 26px;
       padding: clamp(1.8rem, 4vw, 2.8rem);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      color: var(--text-main);
-      animation: fadeInScale 0.5s ease-out;
+      box-shadow: 
+        0 25px 60px rgba(0, 0, 0, 0.85),
+        0 0 35px rgba(56, 189, 248, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      color: #f8fafc;
+      animation: fadeInScale 0.45s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     @keyframes fadeInScale {
-      from { opacity: 0; transform: scale(0.96) translateY(12px); }
+      from { opacity: 0; transform: scale(0.96) translateY(14px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
     }
 
+    /* Bluish-white top status badge */
     .contract-badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.35rem 1rem;
+      gap: 0.6rem;
+      padding: 0.4rem 1.15rem;
       border-radius: 9999px;
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: #f87171;
-      font-size: 0.85rem;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.55);
+      color: #e0f2fe;
+      font-size: 0.82rem;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
       margin-bottom: 1.2rem;
     }
 
+    .contract-badge .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 10px #38bdf8, 0 0 4px #ffffff;
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
     .rules-header h1 {
-      font-size: clamp(1.75rem, 3.2vw, 2.3rem);
+      font-size: clamp(1.8rem, 3.4vw, 2.35rem);
       font-weight: 800;
       line-height: 1.2;
-      background: linear-gradient(135deg, #ffffff 40%, var(--accent-lavender) 100%);
+      background: linear-gradient(135deg, #ffffff 40%, #bae6fd 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 0.6rem;
+      margin: 0 0 0.6rem 0;
+      letter-spacing: -0.02em;
     }
 
     .rules-header p {
-      color: var(--text-muted);
-      font-size: 1rem;
+      color: #94a3b8;
+      font-size: 0.98rem;
       line-height: 1.5;
+      margin: 0;
     }
 
+    /* ==========================================================================
+       KEY RULE BOXES WITH STRIKING BLUISH-WHITE ACCENT LINES
+       ========================================================================== */
     .contract-body {
       margin-top: 1.8rem;
       display: flex;
       flex-direction: column;
-      gap: 1.2rem;
+      gap: 1.15rem;
     }
 
     .policy-box {
+      position: relative;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 16px;
-      padding: 1.25rem 1.4rem;
+      padding: 1.25rem 1.45rem;
       transition: all 0.25s ease;
     }
 
     .policy-box:hover {
-      border-color: rgba(168, 85, 247, 0.4);
       background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-2px);
     }
 
+    /* 🚨 RULE 1: Facebook Social Accountability Guarantee */
     .policy-box.highlight-fb {
-      border-color: rgba(59, 130, 246, 0.4);
-      background: rgba(59, 130, 246, 0.06);
+      border-left: 4px solid #38bdf8;
+      background: linear-gradient(90deg, rgba(56, 189, 248, 0.08) 0%, rgba(15, 23, 42, 0.5) 100%);
+      box-shadow: -4px 0 16px rgba(56, 189, 248, 0.3);
+      border-top: 1px solid rgba(56, 189, 248, 0.3);
+      border-right: 1px solid rgba(56, 189, 248, 0.2);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    /* ⚡ RULE 2: Daily Streak & Habit Thresholds */
+    .policy-box.highlight-streak {
+      border-left: 4px solid #7dd3fc;
+      background: linear-gradient(90deg, rgba(125, 211, 252, 0.06) 0%, rgba(15, 23, 42, 0.45) 100%);
+      box-shadow: -4px 0 14px rgba(125, 211, 252, 0.22);
+      border-top: 1px solid rgba(125, 211, 252, 0.25);
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* 🌱 RULE 3: Rewards & Living Companion */
+    .policy-box.highlight-rewards {
+      border-left: 4px solid #a855f7;
+      background: linear-gradient(90deg, rgba(168, 85, 247, 0.06) 0%, rgba(15, 23, 42, 0.45) 100%);
+      box-shadow: -4px 0 14px rgba(168, 85, 247, 0.22);
+      border-top: 1px solid rgba(168, 85, 247, 0.25);
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .policy-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 0.45rem;
     }
 
     .policy-title {
@@ -102,39 +284,113 @@
       font-size: 1.05rem;
       font-weight: 700;
       color: #ffffff;
-      margin-bottom: 0.4rem;
+    }
+
+    /* Striking bluish-white alert pill */
+    .alert-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      border-radius: 5px;
+      background: rgba(56, 189, 248, 0.18);
+      border: 1px solid #38bdf8;
+      color: #e0f2fe;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+      white-space: nowrap;
     }
 
     .policy-desc {
-      font-size: 0.9rem;
+      font-size: 0.91rem;
       color: #cbd5e1;
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
+    /* High contrast warning quotation */
     .quote-warning {
-      margin-top: 0.6rem;
-      padding: 0.6rem 0.9rem;
-      background: rgba(0, 0, 0, 0.35);
+      margin-top: 0.75rem;
+      padding: 0.75rem 1.1rem;
+      background: rgba(3, 7, 18, 0.7);
       border-left: 3px solid #f97316;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 0.85rem;
+      border-right: 1px solid rgba(56, 189, 248, 0.25);
+      border-top: 1px solid rgba(56, 189, 248, 0.25);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.88rem;
       color: #fed7aa;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
     }
 
+    /* Threshold pills */
+    .threshold-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .threshold-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .threshold-chip.green {
+      color: #6ee7b7;
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .threshold-chip.orange {
+      color: #fdba74;
+      border-color: rgba(249, 115, 22, 0.4);
+      background: rgba(249, 115, 22, 0.1);
+    }
+
+    .threshold-chip.white-blue {
+      color: #e0f2fe;
+      border-color: rgba(56, 189, 248, 0.5);
+      background: rgba(56, 189, 248, 0.12);
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+    }
+
+    /* ==========================================================================
+       PLEDGE CHECKBOXES & ACTIONS
+       ========================================================================== */
     .pledge-list {
-      margin-top: 1.6rem;
+      margin-top: 1.8rem;
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 0.95rem;
     }
 
     .pledge-item {
       display: flex;
       align-items: flex-start;
-      gap: 0.85rem;
+      gap: 0.9rem;
       cursor: pointer;
       user-select: none;
+      padding: 8px 12px;
+      border-radius: 10px;
+      transition: background 0.2s ease;
+    }
+
+    .pledge-item:hover {
+      background: rgba(255, 255, 255, 0.03);
     }
 
     .pledge-item input[type="checkbox"] {
@@ -144,8 +400,8 @@
       height: 22px;
       margin-top: 2px;
       border-radius: 6px;
-      border: 2px solid rgba(168, 85, 247, 0.5);
-      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(56, 189, 248, 0.5);
+      background: rgba(255, 255, 255, 0.04);
       cursor: pointer;
       display: grid;
       place-content: center;
@@ -153,10 +409,16 @@
       flex-shrink: 0;
     }
 
+    .pledge-item input[type="checkbox"]:hover {
+      border-color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+    }
+
+    /* Striking bluish-white active checkbox mark */
     .pledge-item input[type="checkbox"]:checked {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      border-color: #34d399;
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+      background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+      border-color: #e0f2fe;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.8), 0 0 4px #ffffff;
     }
 
     .pledge-item input[type="checkbox"]:checked::before {
@@ -169,51 +431,58 @@
     .pledge-label {
       font-size: 0.92rem;
       color: #e2e8f0;
-      line-height: 1.45;
+      line-height: 1.5;
     }
 
     .rules-actions {
       margin-top: 2rem;
       display: flex;
       flex-direction: column;
-      gap: 0.8rem;
+      gap: 0.85rem;
     }
 
+    /* High-contrast electric commitment button */
     .btn-commit {
       width: 100%;
-      padding: 1rem;
+      padding: 1.05rem;
       border-radius: 14px;
-      border: none;
-      background: linear-gradient(135deg, #9333ea 0%, #6366f1 100%);
+      border: 1px solid rgba(224, 242, 254, 0.3);
+      background: linear-gradient(135deg, #0284c7 0%, #4f46e5 50%, #9333ea 100%);
       color: #ffffff;
       font-size: 1.05rem;
       font-weight: 700;
+      letter-spacing: -0.01em;
       cursor: pointer;
-      box-shadow: 0 8px 24px rgba(147, 51, 234, 0.45);
-      transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      box-shadow: 0 8px 25px rgba(56, 189, 248, 0.4);
+      transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.6rem;
+      gap: 0.65rem;
     }
 
     .btn-commit:disabled {
-      opacity: 0.45;
+      opacity: 0.4;
       cursor: not-allowed;
       box-shadow: none;
       filter: grayscale(0.8);
+      border-color: rgba(255, 255, 255, 0.1);
     }
 
     .btn-commit:not(:disabled):hover {
       transform: translateY(-2px);
-      box-shadow: 0 12px 30px rgba(147, 51, 234, 0.65);
+      box-shadow: 0 12px 32px rgba(56, 189, 248, 0.6);
       filter: brightness(1.1);
+    }
+
+    .btn-commit:not(:disabled):active {
+      transform: translateY(0);
     }
 
     .btn-secondary-link {
       background: transparent;
       border: none;
-      color: var(--text-muted);
+      color: #94a3b8;
       font-size: 0.88rem;
       cursor: pointer;
       text-align: center;
@@ -228,54 +497,112 @@
 </head>
 <body>
 
-  <!-- Ambient starry background -->
-  <div class="night"></div>
+  <!-- Cohesive Deep Dark Slate Backdrop -->
+  <div class="contract-backdrop"></div>
+  <div class="grid-pattern"></div>
+  <div class="ambient-halo"></div>
 
+  <!-- Subtly Encircled Exclamation Marks (Bluish-white, Greenish, Reddish-orange) -->
+  <div class="exclamation-watermarks-layer" aria-hidden="true">
+    <!-- Bluish-White Mark -->
+    <div class="exclamation-mark mark-bluish-white">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="5" />
+        <line x1="50" y1="24" x2="50" y2="56" stroke="currentColor" stroke-width="7" stroke-linecap="round" />
+        <circle cx="50" cy="72" r="5" fill="currentColor" />
+      </svg>
+    </div>
+
+    <!-- Greenish Mark -->
+    <div class="exclamation-mark mark-greenish">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="5" />
+        <line x1="50" y1="24" x2="50" y2="56" stroke="currentColor" stroke-width="7" stroke-linecap="round" />
+        <circle cx="50" cy="72" r="5" fill="currentColor" />
+      </svg>
+    </div>
+
+    <!-- Reddish-Orange Mark -->
+    <div class="exclamation-mark mark-reddish-orange">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="5" />
+        <line x1="50" y1="24" x2="50" y2="56" stroke="currentColor" stroke-width="7" stroke-linecap="round" />
+        <circle cx="50" cy="72" r="5" fill="currentColor" />
+      </svg>
+    </div>
+
+    <!-- Supplementary Bluish-White Accent -->
+    <div class="exclamation-mark mark-bluish-secondary">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="5" />
+        <line x1="50" y1="24" x2="50" y2="56" stroke="currentColor" stroke-width="7" stroke-linecap="round" />
+        <circle cx="50" cy="72" r="5" fill="currentColor" />
+      </svg>
+    </div>
+  </div>
+
+
+  <!-- Main Rules Card -->
   <div class="rules-card">
     <div class="contract-badge">
-      <span>⚖️</span>
-      <span>Discipline & Accountability Policy</span>
+      <span class="badge-dot"></span>
+      <span>Discipline & Social Accountability Policy</span>
     </div>
 
     <div class="rules-header">
       <h1>The Habitism Commitment</h1>
-      <p id="welcomeUserGreeting">Welcome to your transformation journey. Habitism is built on real accountability.</p>
+      <p id="welcomeUserGreeting">Welcome to your transformation journey. Habitism turns intentions into ironclad habits.</p>
     </div>
 
     <div class="contract-body">
       <!-- Rule 1: Facebook Public Accountability -->
       <div class="policy-box highlight-fb">
-        <div class="policy-title">
-          <span>📢</span>
-          <span>Facebook Social Accountability Guarantee</span>
+        <div class="policy-header-row">
+          <div class="policy-title">
+            <span>📢</span>
+            <span>Facebook Social Accountability Guarantee</span>
+          </div>
+          <span class="alert-tag">⚡ Automated Timeline</span>
         </div>
         <div class="policy-desc">
           If you fail to accomplish your daily habits before midnight (11:59 PM), our backend triggers an automated Facebook Graph API post directly to the <strong>Habitism</strong> public accountability timeline:
         </div>
         <div class="quote-warning">
-          &ldquo;This person made this commitment but did not complete it.&rdquo;
+          <span>⚠️</span>
+          <span>&ldquo;This person made this commitment but did not complete it.&rdquo;</span>
         </div>
       </div>
 
       <!-- Rule 2: Daily Streak Reset & Penalties -->
-      <div class="policy-box">
-        <div class="policy-title">
-          <span>🔥</span>
-          <span>Daily Streak & Habit Thresholds</span>
+      <div class="policy-box highlight-streak">
+        <div class="policy-header-row">
+          <div class="policy-title">
+            <span>🔥</span>
+            <span>Daily Streak & Habit Thresholds</span>
+          </div>
+          <span class="alert-tag" style="border-color: #7dd3fc; background: rgba(125,211,252,0.18);">11:59 PM Deadline</span>
         </div>
         <div class="policy-desc">
           Finish at least <strong>5 habits</strong> daily to keep your streak glowing Green. Reaching <strong>6–7 habits</strong> upgrades your day to Orange, and <strong>8+ habits</strong> earns a glowing White-Blue halo. Missing your goal resets your streak to 0 days unless protected by a Streak Freeze.
         </div>
+        <div class="threshold-tags">
+          <span class="threshold-chip green">🟢 5 Habits (Green Tier)</span>
+          <span class="threshold-chip orange">🟠 6–7 Habits (Orange Tier)</span>
+          <span class="threshold-chip white-blue">💎 8+ Habits (White-Blue Tier)</span>
+        </div>
       </div>
 
       <!-- Rule 3: Gamification & Living Companion -->
-      <div class="policy-box">
-        <div class="policy-title">
-          <span>🌱</span>
-          <span>Rewards, Shop & Living Companion</span>
+      <div class="policy-box highlight-rewards">
+        <div class="policy-header-row">
+          <div class="policy-title">
+            <span>🌱</span>
+            <span>Rewards, Shop & Living Companion</span>
+          </div>
+          <span class="alert-tag" style="border-color: #c084fc; background: rgba(192,132,252,0.18); color: #f3e8ff;">Protection & Rewards</span>
         </div>
         <div class="policy-desc">
-          Every completed habit gives you <strong>🪙 Habit Coins</strong>. Use coins in the Shop to acquire <strong>❄️ Streak Freezes</strong> to protect yourself on chaotic days. Maintain a 7-day streak to evolve your companion from a Seed to a Radiant Bloom and unlock your printable <strong>Official Weekly Certificate</strong>!
+          Every completed habit awards <strong>🪙 Habit Coins</strong>. Use coins in the Shop to acquire <strong>❄️ Streak Freezes</strong> that shield you on chaotic days. Maintain a 7-day streak to evolve your companion from a Seed to a Radiant Bloom and unlock your printable <strong>Official Weekly Certificate</strong>!
         </div>
       </div>
     </div>
@@ -310,7 +637,7 @@
         document.getElementById("welcomeUserGreeting").innerText = 
           `Welcome, ${user.name || 'Champion'}. Habitism turns intentions into ironclad habits.`;
         
-        // If already committed, they can go directly to dashboard if they want
+        // If already committed, let user re-enter dashboard
         if (user.committed) {
           const btn = document.getElementById("commitBtn");
           btn.disabled = false;
@@ -336,4 +663,3 @@
   </script>
 </body>
 </html>
-

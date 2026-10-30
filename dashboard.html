@@ -20,7 +20,9 @@
       <span>HABITISM</span>
     </a>
 
-    <div class="nav-actions">
+    <button class="nav-mobile-toggle" id="navMobileToggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="navActions">☰</button>
+
+    <div class="nav-actions" id="navActions">
       <!-- User profile & Facebook badge -->
       <div class="stat-pill" title="Logged in user">
         <span>👤</span>
@@ -67,12 +69,20 @@
         <span>Accountability</span>
       </button>
 
+      <!-- Admin Portal Button (Visible to Admins only) -->
+      <a href="admin.html" class="nav-btn-link btn-secondary" id="adminPortalBtn" style="display:none; border-color: rgba(251, 191, 36, 0.4); color: #fde68a; background: rgba(251, 191, 36, 0.12);" title="Open Administrator Management Dashboard">
+        <span>👑</span>
+        <span>Admin Panel</span>
+      </a>
+
       <!-- Prominent Visible Log Out Button -->
       <button class="nav-btn-link btn-logout" onclick="Habitism.logout()" title="Safely log out of your session">
         <span>🚪</span>
         <span>Log Out</span>
       </button>
     </div>
+
+    <div class="nav-mobile-overlay" id="navMobileOverlay"></div>
   </header>
 
   <!-- 📦 Main Above-The-Fold Side-by-Side Content Area -->
@@ -272,7 +282,11 @@
       <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 14px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.88rem; line-height: 1.5;">
         <div><strong>Connected Page:</strong> Habitism</div>
         <div><strong>Page ID:</strong> <code style="color: #60a5fa;">1496888330165860</code></div>
-        <div><strong>Policy Consequence:</strong> Automated Graph API post on unfulfilled daily habits:</div>
+        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <span><strong>Your Linked Account:</strong></span>
+          <div id="fbAccountLinkStatus" style="font-size: 0.82rem;">Checking...</div>
+        </div>
+        <div style="margin-top: 8px;"><strong>Policy Consequence:</strong> Automated Graph API post on unfulfilled daily habits:</div>
         <div style="margin-top: 6px; padding: 6px 10px; background: rgba(0,0,0,0.3); border-left: 3px solid #f97316; font-family: monospace; font-size: 0.82rem; color: #fed7aa;">
           &ldquo;This person made this commitment but did not complete it.&rdquo;
         </div>
@@ -290,6 +304,9 @@
 
   <!-- Dynamic Toast Notification -->
   <div id="habitToast" class="habit-toast">✨ Habit Completed!</div>
+
+  <!-- Global Unclipped Tooltip Portal -->
+  <div id="habitismGlobalTooltip" class="global-tooltip-popup" role="tooltip" aria-hidden="true"></div>
 
   <script src="app.js"></script>
   <script src="dashboard.js"></script>

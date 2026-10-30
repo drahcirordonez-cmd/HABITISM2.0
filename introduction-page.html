@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HABITISM • The Habit Tracker with Real Consequences</title>
+  <link rel="stylesheet" href="app.css">
+  <style>
+    /* Reset and force full-width vertical column layout */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100vh;
+      background-color: var(--dark-bg, #010113);
+      color: var(--text-primary, #f8fafc);
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      overflow-x: hidden;
+      overflow-y: auto;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    /* Ambient starry background */
+    .night {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+      background-image: 
+        radial-gradient(ellipse at top, transparent 0%, var(--dark-bg, #010113) 80%),
+        radial-gradient(ellipse at bottom, var(--dark-bg, #010113), rgba(145, 233, 255, 0.15)),
+        linear-gradient(90deg, rgba(255, 94, 0, 0.08), rgba(147, 51, 234, 0.08));
+    }
+
+    .ambient-glow {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: 
+        radial-gradient(circle at 20% 35%, rgba(147, 51, 234, 0.15), transparent 50%),
+        radial-gradient(circle at 80% 65%, rgba(16, 185, 129, 0.12), transparent 50%);
+    }
+
+    /* 🧭 Sticky Top Navigation Bar (Full Width) */
+    .navbar {
+      position: relative;
+      z-index: 100;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px clamp(20px, 4vw, 48px);
+      background: rgba(18, 14, 38, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+
+    /* 🎯 Hero Container Centered Horizontally & Vertically */
+    .hero-container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: clamp(30px, 5vh, 60px) clamp(16px, 3vw, 32px) 60px clamp(16px, 3vw, 32px);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      box-sizing: border-box;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 18px;
+      border-radius: 50px;
+      background: rgba(168, 85, 247, 0.16);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #d8b4fe;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.25);
+    }
+
+    .hero-title {
+      font-size: clamp(2.3rem, 4.8vw, 4rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      color: #ffffff;
+      margin: 0 0 18px 0;
+      max-width: 900px;
+      text-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #c084fc 0%, #60a5fa 50%, #34d399 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: clamp(0.96rem, 1.35vw, 1.2rem);
+      color: #cbd5e1;
+      max-width: 720px;
+      line-height: 1.6;
+      margin: 0 auto 36px auto;
+    }
+
+    .hero-cta-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: clamp(36px, 6vh, 56px);
+    }
+
+    .cta-btn-large {
+      padding: 14px 34px;
+      border-radius: 14px;
+      font-size: 1.02rem;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+
+    /* 4-Card Balanced Horizontal Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      width: 100%;
+      max-width: 1140px;
+      text-align: left;
+    }
+
+    .feature-card {
+      background: rgba(18, 14, 38, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(168, 85, 247, 0.45);
+      box-shadow: 0 20px 50px rgba(112, 26, 117, 0.3);
+    }
+
+    .feature-icon {
+      font-size: 2.2rem;
+      margin-bottom: 14px;
+    }
+
+    .feature-card h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 8px 0;
+    }
+
+    .feature-card p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 980px) {
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 580px) {
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      .navbar {
+        padding: 12px 18px;
+      }
+      .hero-cta-group {
+        flex-direction: column;
+        width: 100%;
+      }
+      .cta-btn-large {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient background glow layers -->
+  <div class="night"></div>
+  <div class="ambient-glow"></div>
+
+  <!-- 🧭 Top Navigation Bar -->
+  <nav class="navbar">
+    <a href="introduction-page.html" class="brand-logo">
+      <div class="brand-icon">🌸</div>
+      <span>HABITISM</span>
+    </a>
+    <div class="nav-actions">
+      <a href="login.html" class="nav-btn-link btn-secondary">Log In</a>
+      <a href="login.html" class="nav-btn-link btn-primary">Start Your Journey →</a>
+    </div>
+  </nav>
+
+  <!-- 🎯 Centered Hero Section -->
+  <main class="hero-container">
+    <div class="hero-badge">⚡ Real Social Accountability & Gamified Habits</div>
+    <h1 class="hero-title">Turn Daily Discipline Into A <span>Living Bloom</span></h1>
+    <p class="hero-desc">
+      Build life-changing consistency with habit levels, watch your botanical companion grow, and stay committed with automated Facebook accountability.
+    </p>
+
+    <div class="hero-cta-group">
+      <a href="login.html" id="enterBtn" class="cta-btn-large btn-primary">
+        <span>Enter Habitism</span>
+        <span>→</span>
+      </a>
+      <a href="login.html" class="cta-btn-large btn-facebook" style="width: auto;">
+        <svg width="20" height="20" fill="#ffffff" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        <span>Continue with Facebook</span>
+      </a>
+    </div>
+
+    <!-- 4 Balanced Feature Cards -->
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🌺</div>
+        <h3>Botanical Companion</h3>
+        <p>Your consistency feeds your visual companion. Watch it evolve from a tender seed into a fully bloomed lotus as your streak climbs.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Facebook Social Penalty</h3>
+        <p>Miss your daily commitment before midnight? Our Graph API engine holds you accountable publicly on Facebook so you never slack off.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🪙</div>
+        <h3>Coins & Streak Freezes</h3>
+        <p>Complete daily habits to earn coins. Use your earnings in the shop to purchase Streak Freezes that shield you on emergency days.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📜</div>
+        <h3>Weekly Certificates</h3>
+        <p>Complete an uninterrupted 7-day streak to unlock an official, personalized achievement certificate verifying your discipline.</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    // Redirect if already logged in and committed
+    const user = Habitism.getCurrentUser();
+    if (user && user.committed) {
+      const enterBtn = document.getElementById("enterBtn");
+      if (enterBtn) {
+        enterBtn.innerHTML = "<span>Continue to Dashboard</span> <span>→</span>";
+        enterBtn.href = "dashboard.html";
+      }
+    }
+  </script>
+</body>
+</html>
