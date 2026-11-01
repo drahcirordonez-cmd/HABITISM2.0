@@ -1,0 +1,34 @@
+app = "habitism"
+primary_region = "scl"
+
+[build]
+  # Uses Nixpacks buildpacks automatically (no Dockerfile needed)
+
+[env]
+  PORT = "3000"
+  NODE_VERSION = "22"
+
+[experimental]
+  auto_rollback = true
+
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+
+  [services.concurrency]
+    type = "requests"
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+[[mounts]]
+  source = "habitism_data"
+  destination = "/app"

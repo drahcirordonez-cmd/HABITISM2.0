@@ -6,6 +6,7 @@
  * Multi-user isolation, Role-based auth (Admin & User), Admin Dashboard API
  */
 
+try { if (typeof process.loadEnvFile === 'function') process.loadEnvFile(); } catch (e) {}
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -133,17 +134,48 @@ seedDefaultAccounts();
 // 2. FACEBOOK GRAPH API CONFIGURATION
 // ============================================================================
 const FB_CONFIG = {
-  pageName: 'Habitism',
-  pageId: '1496888330165860',
-  accessToken: 'EAAOG8ZC3JOVoBS327GB8vxISL9rfvP8YOhCZCJ0kjtSD8mhLg2ZB5obSTTJGRHIjihXUiZBMZBgnJTiWoqZBm8PetvuSipvRZBAi2x9O4A7ZAZCJ80EpswsOEAb9dkIqMQLLUncnNWTGQsE1Jx8A0SMDXQdz7G36qEepZCUPc2KlZCz8vVJXEnUosuW1SDen9YH7DcMUXQ1R9tG4WMeWajrr1moMGByhy5PbGcQOfPrhpcZD'
+  appId: process.env.FB_APP_ID || '992807423129946',
+  pageName: process.env.FB_PAGE_NAME || 'Habitism',
+  pageId: process.env.FB_PAGE_ID || '1496888330165860',
+  accessToken: process.env.FB_ACCESS_TOKEN || 'EAAOG8ZC3JOVoBS327GB8vxISL9rfvP8YOhCZCJ0kjtSD8mhLg2ZB5obSTTJGRHIjihXUiZBMZBgnJTiWoqZBm8PetvuSipvRZBAi2x9O4A7ZAZCJ80EpswsOEAb9dkIqMQLLUncnNWTGQsE1Jx8A0SMDXQdz7G36qEepZCUPc2KlZCz8vVJXEnUosuW1SDen9YH7DcMUXQ1R9tG4WMeWajrr1moMGByhy5PbGcQOfPrhpcZD'
 };
 
 /**
  * Triggers Facebook Graph API post on failed commitment for a specific active user
  */
-async function triggerFacebookAccountabilityPost(userId, userName, dateStr, userFbName = null) {
+async function triggerFacebookAccountabilityPost(userId, userName, dateStr, userFbName = null, failedTasks = [], allTasks = []) {
   const targetLabel = userFbName ? `${userName} (FB: ${userFbName})` : userName;
-  const message = `⚠️ HABITISM SOCIAL ACCOUNTABILITY ALERT:\n\nUser ${targetLabel} made a solemn commitment on Habitism for ${dateStr}, but failed to complete their daily habits before the 11:59 PM deadline!\n\n"This person made this commitment but did not complete it."\n\n#Habitism #Accountability #Discipline #HabitTracker #Consistency`;
+  
+  // Format the to-do list highlighting unfulfilled tasks
+  let taskListText = '';
+  if (failedTasks && failedTasks.length > 0) {
+    taskListText = '\n\n📋 COMMITTED DAILY TO-DO LIST (UNFULFILLED):\n' + 
+      failedTasks.map((t, i) => `  ❌ [FAILED] ${typeof t === 'string' ? t : (t.text || t.title || 'Habit #' + (i + 1))}`).join('\n');
+
+    const completedTasks = (allTasks || []).filter(t => {
+      const text = typeof t === 'string' ? t : (t.text || t.title);
+      return !failedTasks.some(f => (typeof f === 'string' ? f : (f.text || f.title)) === text);
+    });
+
+    if (completedTasks.length > 0) {
+      taskListText += '\n\nCompleted Habits:\n' + 
+        completedTasks.map((t, i) => `  ✅ [Finished] ${typeof t === 'string' ? t : (t.text || t.title || 'Habit #' + (i + 1))}`).join('\n');
+    }
+  } else if (allTasks && allTasks.length > 0) {
+    taskListText = '\n\n📋 COMMITTED DAILY TO-DO LIST:\n' + 
+      allTasks.map((t, i) => `  ❌ [Not Fulfilled] ${typeof t === 'string' ? t : (t.text || t.title || 'Habit #' + (i + 1))}`).join('\n');
+  }
+
+  const message = `⚠️ HABITISM SOCIAL ACCOUNTABILITY NOTICE:
+
+User ${targetLabel} made a solemn discipline commitment on Habitism for ${dateStr}, but failed to complete their daily habits before the 11:59 PM deadline!
+${taskListText}
+
+"This person made this commitment but did not complete it."
+
+Discipline Penalty: Daily streak has been broken and reset to 0 days.
+
+#Habitism #Accountability #Discipline #HabitTracker #Consistency`;
 
   try {
     const url = `https://graph.facebook.com/v19.0/${FB_CONFIG.pageId}/feed`;
@@ -161,8 +193,8 @@ async function triggerFacebookAccountabilityPost(userId, userName, dateStr, user
     const isSuccess = response.ok && data.id;
 
     const stmt = db.prepare(`
-      INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, post_id, response_payload)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, fb_post_id, post_id, response_payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -171,6 +203,8 @@ async function triggerFacebookAccountabilityPost(userId, userName, dateStr, user
       dateStr,
       message,
       isSuccess ? 'published' : 'api_error_fallback',
+      FB_CONFIG.pageId,
+      data.id || 'simulated_post_' + Date.now(),
       data.id || null,
       JSON.stringify(data)
     );
@@ -179,22 +213,24 @@ async function triggerFacebookAccountabilityPost(userId, userName, dateStr, user
       success: isSuccess,
       postId: data.id || null,
       data: data,
+      formattedMessage: message,
       message: isSuccess 
-        ? `Published accountability post to Facebook Page: ${FB_CONFIG.pageName} (ID: ${data.id})`
+        ? `Published accountability post to Facebook Page: ${FB_CONFIG.pageName} (Post ID: ${data.id})`
         : `Facebook API notice: ${data.error ? data.error.message : 'Fallback logged in database'}`
     };
   } catch (error) {
     console.error('FB Graph API call error:', error.message);
 
     const stmt = db.prepare(`
-      INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, response_payload)
-      VALUES (?, ?, ?, ?, 'network_error_fallback', ?)
+      INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, response_payload)
+      VALUES (?, ?, ?, ?, 'network_error_fallback', ?, ?)
     `);
-    stmt.run(userId, userName, dateStr, message, error.message);
+    stmt.run(userId, userName, dateStr, message, FB_CONFIG.pageId, error.message);
 
     return {
       success: false,
       error: error.message,
+      formattedMessage: message,
       message: 'Accountability penalty recorded in database (Network fallback).'
     };
   }
@@ -422,7 +458,7 @@ app.post('/api/shop/buy-freeze', (req, res) => {
 
 // --- Punishment Engine & Facebook Trigger ---
 app.post('/api/accountability/trigger-penalty', async (req, res) => {
-  const { userId, dateStr } = req.body;
+  const { userId, dateStr, failedTasks, allTasks } = req.body;
   const user = db.prepare('SELECT id, name, username, email, streak, streak_freezes, facebook_id, facebook_name FROM users WHERE id = ?').get(userId);
 
   if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -437,14 +473,26 @@ app.post('/api/accountability/trigger-penalty', async (req, res) => {
     });
   }
 
-  // No freeze available: streak resets to 0 and Facebook Graph API alert is triggered!
+  // Streak resets to 0 as penalty
   db.prepare('UPDATE users SET streak = 0 WHERE id = ?').run(userId);
+
+  // If failedTasks not passed in body, try to inspect user_task_states
+  let tasksToFail = failedTasks || [];
+  let tasksAll = allTasks || [];
+  if (tasksToFail.length === 0) {
+    try {
+      const savedTasks = db.prepare('SELECT state_value FROM user_task_states WHERE user_id = ? AND state_key = ?').get(userId, 'custom_tasks');
+      if (savedTasks) tasksToFail = JSON.parse(savedTasks.state_value);
+    } catch (e) {}
+  }
 
   const fbResult = await triggerFacebookAccountabilityPost(
     user.id,
     user.name,
     dateStr || new Date().toDateString(),
-    user.facebook_name
+    user.facebook_name,
+    tasksToFail,
+    tasksAll
   );
 
   return res.json({
@@ -452,6 +500,7 @@ app.post('/api/accountability/trigger-penalty', async (req, res) => {
     shielded: false,
     streakReset: true,
     facebookResult: fbResult,
+    postMessage: fbResult.formattedMessage,
     message: 'Daily commitment failed. Streak reset to 0 and Facebook Social Accountability triggered.'
   });
 });

@@ -223,32 +223,85 @@ const Habitism = (() => {
     }
   }
 
-  async function facebookLogin(fbName = 'Facebook Champion') {
-    const fbId = 'fb_' + Math.floor(100000 + Math.random() * 900000);
-    const fbEmail = `fb_user_${fbId}@facebook.com`;
+    const FB_APP_ID = '992807423129946';
 
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/facebook`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: fbName, email: fbEmail, facebookId: fbId })
-      });
-      const data = await res.json();
-      if (data.user) {
-        setCurrentUser(data.user);
-        return data.user;
+  // --------------------------------------------------------------------------
+  // Meta Facebook JavaScript SDK Integration (App ID: 992807423129946)
+  // --------------------------------------------------------------------------
+  function initFacebookSDK() {
+    if (window.FB) return;
+
+    window.fbAsyncInit = function() {
+      try {
+        window.FB.init({
+          appId: FB_APP_ID,
+          cookie: true,
+          xfbml: true,
+          version: 'v19.0'
+        });
+        console.log('✅ Meta Facebook SDK Initialized (App ID: ' + FB_APP_ID + ')');
+      } catch (e) {
+        console.warn('Facebook SDK init note:', e.message);
       }
-    } catch (err) {
-      console.warn('Offline FB auth simulation:', err.message);
-    }
+    };
 
+    if (!document.getElementById('facebook-jssdk')) {
+      const js = document.createElement('script');
+      js.id = 'facebook-jssdk';
+      js.src = 'https://connect.facebook.net/en_US/sdk.js';
+      js.async = true;
+      js.defer = true;
+      js.crossOrigin = 'anonymous';
+      document.head.appendChild(js);
+    }
+  }
+
+  async function loginWithFacebook() {
+    initFacebookSDK();
+
+    return new Promise((resolve, reject) => {
+      // If window.FB is available and initialized, open real OAuth dialog
+      if (window.FB && typeof window.FB.login === 'function') {
+        window.FB.login((response) => {
+          if (response.authResponse) {
+            const accessToken = response.authResponse.accessToken;
+            window.FB.api('/me', { fields: 'id,name,email' }, async (userInfo) => {
+              try {
+                const user = await facebookLogin(userInfo.name, userInfo.email, userInfo.id, accessToken);
+                resolve(user);
+              } catch (err) {
+                resolve(createOfflineFbUser(userInfo.name, userInfo.email, userInfo.id));
+              }
+            });
+          } else {
+            // Cancelled or blocked by domain whitelist in local dev
+            fallbackFbPrompt(resolve, reject);
+          }
+        }, { scope: 'public_profile,email' });
+      } else {
+        fallbackFbPrompt(resolve, reject);
+      }
+    });
+  }
+
+  function fallbackFbPrompt(resolve, reject) {
+    const fbName = prompt('Facebook Login (App ID: ' + FB_APP_ID + '):\nEnter your Facebook profile name for social accountability:', 'Accountability Champion');
+    if (!fbName) return reject(new Error('Facebook login cancelled.'));
+    facebookLogin(fbName).then(resolve).catch(err => {
+      const fallback = createOfflineFbUser(fbName);
+      resolve(fallback);
+    });
+  }
+
+  function createOfflineFbUser(name, email = null, id = null) {
+    const finalId = id || ('fb_' + Math.floor(100000 + Math.random() * 900000));
     const user = {
       id: Date.now(),
-      name: fbName,
-      username: 'fb_' + fbName.toLowerCase().replace(/[^a-z0-9]/g, ''),
-      email: fbEmail,
-      facebook_id: fbId,
-      facebook_name: fbName,
+      name: name,
+      username: 'fb_' + name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10),
+      email: email || `fb_${finalId}@habitism.app`,
+      facebook_id: finalId,
+      facebook_name: name,
       role: 'user',
       committed: 0,
       coins: 150,
@@ -258,6 +311,28 @@ const Habitism = (() => {
     };
     setCurrentUser(user);
     return user;
+  }
+
+  async function facebookLogin(fbName = 'Facebook Champion', fbEmail = null, fbId = null, accessToken = null) {
+    const finalId = fbId || ('fb_' + Math.floor(100000 + Math.random() * 900000));
+    const finalEmail = fbEmail || `fb_${finalId}@habitism.app`;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/facebook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: fbName, email: finalEmail, facebookId: finalId, accessToken })
+      });
+      const data = await res.json();
+      if (data.user) {
+        setCurrentUser(data.user);
+        return data.user;
+      }
+    } catch (err) {
+      console.warn('Offline FB auth fallback:', err.message);
+    }
+
+    return createOfflineFbUser(fbName, finalEmail, finalId);
   }
 
   async function linkFacebook(userId, fbId, fbName) {
@@ -378,7 +453,7 @@ const Habitism = (() => {
   // ==========================================================================
   // 5. Accountability & Penalty Simulation (Facebook Graph API)
   // ==========================================================================
-  async function simulateAccountabilityCheck(dateStr) {
+  async function simulateAccountabilityCheck(dateStr, failedTasks = [], allTasks = []) {
     const user = getCurrentUser();
     if (!user) return;
 
@@ -386,7 +461,7 @@ const Habitism = (() => {
       const res = await fetch(`${API_BASE}/api/accountability/trigger-penalty`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, dateStr })
+        body: JSON.stringify({ userId: user.id, dateStr, failedTasks, allTasks })
       });
       const data = await res.json();
       
@@ -399,24 +474,16 @@ const Habitism = (() => {
       }
       return data;
     } catch (err) {
-      if (user.streak_freezes > 0) {
-        user.streak_freezes -= 1;
-        setCurrentUser(user);
-        return {
-          success: true,
-          shielded: true,
-          message: '❄️ Streak Freeze used! Your streak was saved from breaking.'
-        };
-      } else {
-        user.streak = 0;
-        setCurrentUser(user);
-        return {
-          success: true,
-          shielded: false,
-          streakReset: true,
-          message: '⚠️ Accountability Alert Triggered: Graph API message logged to Facebook Page.'
-        };
-      }
+      console.warn('Offline accountability fallback:', err.message);
+      user.streak = 0;
+      setCurrentUser(user);
+      return {
+        success: true,
+        shielded: false,
+        streakReset: true,
+        postMessage: `⚠️ HABITISM SOCIAL ACCOUNTABILITY NOTICE:\n\nUser ${user.name} failed daily habits for ${dateStr}!\n\n"This person made this commitment but did not complete it."`,
+        message: 'Accountability penalty executed (Offline simulated mode).'
+      };
     }
   }
 
@@ -583,6 +650,9 @@ const Habitism = (() => {
     register,
     login,
     forgotPassword,
+    FB_APP_ID,
+    initFacebookSDK,
+    loginWithFacebook,
     facebookLogin,
     linkFacebook,
     unlinkFacebook,

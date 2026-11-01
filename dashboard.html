@@ -51,35 +51,76 @@
         </div>
       </div>
 
-      <!-- Weekly Certificate Button -->
-      <button class="nav-btn-link btn-secondary" onclick="openCertificateModal()" title="Weekly Streak Certificate">
+      <!-- Weekly Certificate Button (Priority 4 Collapse) -->
+      <button class="nav-btn-link btn-secondary nav-item-cert" id="navBtnCert" onclick="openCertificateModal()" title="Weekly Streak Certificate">
         <span>🏆</span>
         <span>Certificate</span>
       </button>
 
-      <!-- Task Mode Switcher (Option A vs Option B) -->
-      <button class="nav-btn-link btn-secondary" onclick="openTaskModeModal()" title="Switch between 5 Custom Habits and Developer Levels">
+      <!-- Task Mode Switcher (Priority 3 Collapse) -->
+      <button class="nav-btn-link btn-secondary nav-item-mode" id="navBtnMode" onclick="openTaskModeModal()" title="Switch between 5 Custom Habits and Developer Levels">
         <span>⚙️</span>
         <span>Mode</span>
       </button>
 
-      <!-- Accountability / Facebook Status -->
-      <button class="nav-btn-link btn-secondary" onclick="openAccountabilityModal()" title="Facebook Graph API Commitment Status">
+      <!-- Accountability / Facebook Status (Priority 2 Collapse) -->
+      <button class="nav-btn-link btn-secondary nav-item-accountability" id="navBtnAccountability" onclick="openAccountabilityModal()" title="Facebook Graph API Commitment Status">
         <span>📢</span>
         <span>Accountability</span>
       </button>
 
-      <!-- Admin Portal Button (Visible to Admins only) -->
-      <a href="admin.html" class="nav-btn-link btn-secondary" id="adminPortalBtn" style="display:none; border-color: rgba(251, 191, 36, 0.4); color: #fde68a; background: rgba(251, 191, 36, 0.12);" title="Open Administrator Management Dashboard">
+      <!-- Admin Portal Button (Collapses into overflow) -->
+      <a href="admin.html" class="nav-btn-link btn-secondary nav-item-admin" id="adminPortalBtn" style="display:none; border-color: rgba(251, 191, 36, 0.4); color: #fde68a; background: rgba(251, 191, 36, 0.12);" title="Open Administrator Management Dashboard">
         <span>👑</span>
         <span>Admin Panel</span>
       </a>
 
-      <!-- Prominent Visible Log Out Button -->
-      <button class="nav-btn-link btn-logout" onclick="Habitism.logout()" title="Safely log out of your session">
+      <!-- Prominent Visible Log Out Button (Priority 1 Collapse) -->
+      <button class="nav-btn-link btn-logout nav-item-logout" id="navBtnLogout" onclick="Habitism.logout()" title="Safely log out of your session">
         <span>🚪</span>
         <span>Log Out</span>
       </button>
+
+      <!-- ☰ Progressive Overflow Menu (Hamburger Icon for overflowing buttons) -->
+      <div class="nav-overflow-menu" id="navOverflowMenu">
+        <button type="button" class="nav-overflow-toggle" id="navOverflowToggle" aria-label="More navigation options" aria-expanded="false" title="More Options">
+          <span>☰</span>
+        </button>
+
+        <div class="nav-overflow-dropdown" id="navOverflowDropdown">
+          <div class="overflow-dropdown-header">Navigation Menu</div>
+
+          <!-- Certificate item in dropdown (Priority 4) -->
+          <button type="button" class="overflow-item" id="overflowItemCert" onclick="openCertificateModal()">
+            <span>🏆</span>
+            <span>Weekly Certificate</span>
+          </button>
+
+          <!-- Mode item in dropdown (Priority 3) -->
+          <button type="button" class="overflow-item" id="overflowItemMode" onclick="openTaskModeModal()">
+            <span>⚙️</span>
+            <span>Routine Mode</span>
+          </button>
+
+          <!-- Accountability item in dropdown (Priority 2) -->
+          <button type="button" class="overflow-item" id="overflowItemAccountability" onclick="openAccountabilityModal()">
+            <span>📢</span>
+            <span>Accountability</span>
+          </button>
+
+          <!-- Admin item in dropdown -->
+          <a href="admin.html" class="overflow-item" id="overflowItemAdmin" style="display: none; color: #fde68a;">
+            <span>👑</span>
+            <span>Admin Panel</span>
+          </a>
+
+          <!-- Log Out item in dropdown (Priority 1) -->
+          <button type="button" class="overflow-item overflow-item-logout" id="overflowItemLogout" onclick="Habitism.logout()">
+            <span>🚪</span>
+            <span>Log Out</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="nav-mobile-overlay" id="navMobileOverlay"></div>

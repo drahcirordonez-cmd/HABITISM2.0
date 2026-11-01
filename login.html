@@ -905,17 +905,35 @@
     }
 
     async function handleFacebookLogin() {
-      const fbName = prompt('Enter your Facebook profile name for verification:', 'Accountability Champion') || 'Facebook User';
-      const user = await Habitism.facebookLogin(fbName);
-      
-      if (user.role === 'admin') {
-        window.location.href = 'admin.html';
-      } else if (!user.committed) {
-        window.location.href = 'rules.html';
-      } else {
-        window.location.href = 'dashboard.html';
+      try {
+        const user = await Habitism.loginWithFacebook();
+        
+        if (user.role === 'admin') {
+          window.location.href = 'admin.html';
+        } else if (!user.committed) {
+          window.location.href = 'rules.html';
+        } else {
+          window.location.href = 'dashboard.html';
+        }
+      } catch (err) {
+        if (err.message && !err.message.includes('cancelled')) {
+          const errEl = document.getElementById('authError');
+          if (errEl) {
+            errEl.innerText = err.message;
+            errEl.style.display = 'block';
+          }
+        }
       }
     }
+
+    // Auto-trigger if redirected from Introduction page with ?action=fb
+    window.addEventListener("DOMContentLoaded", () => {
+      Habitism.initFacebookSDK();
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('action') === 'fb') {
+        setTimeout(handleFacebookLogin, 600);
+      }
+    });
   </script>
 </body>
 </html>

@@ -323,6 +323,7 @@ function updateStreak() {
     currentUser.streak = streak;
     Habitism.setCurrentUser(currentUser);
     updateNavbarBadges();
+  initNavbarOverflowEngine();
   }
 }
 
@@ -756,13 +757,20 @@ function openAccountabilityModal() {
 }
 
 async function handleLinkFacebookPrompt() {
-  const fbName = prompt("Enter your Facebook profile name to link for social accountability:", currentUser.name || "Facebook Champion");
-  if (!fbName) return;
-  const fbId = "fb_" + Math.floor(100000 + Math.random() * 900000);
-  await Habitism.linkFacebook(currentUser.id, fbId, fbName);
-  updateNavbarBadges();
-  openAccountabilityModal();
-  showToast("✔ Facebook account linked successfully!");
+  try {
+    const fbUser = await Habitism.loginWithFacebook();
+    if (fbUser && fbUser.facebook_id) {
+      await Habitism.linkFacebook(currentUser.id, fbUser.facebook_id, fbUser.facebook_name || fbUser.name);
+      currentUser = Habitism.getCurrentUser();
+      updateNavbarBadges();
+      openAccountabilityModal();
+      showToast("✔ Facebook profile linked successfully!");
+    }
+  } catch (err) {
+    if (err.message && !err.message.includes('cancelled')) {
+      showToast("Facebook notice: " + err.message);
+    }
+  }
 }
 
 async function handleUnlinkFacebook() {
@@ -775,9 +783,13 @@ async function handleUnlinkFacebook() {
 
 async function handleTestAccountabilityPost() {
   const logEl = document.getElementById("accountabilityLog");
-  logEl.innerHTML = `<div style="color: #93c5fd;">⏳ Contacting Facebook Graph API with Page ID 1496888330165860...</div>`;
+  logEl.innerHTML = `<div style="color: #93c5fd;">⏳ Submitting unfulfilled habits to Facebook Graph API (Page ID 1496888330165860)...</div>`;
 
-  const res = await Habitism.simulateAccountabilityCheck(getTodayString());
+  const activeTasks = getActiveTasks();
+  const activeChecks = getActiveChecks();
+  const failedTasks = activeTasks.filter((t, idx) => !activeChecks[idx]);
+
+  const res = await Habitism.simulateAccountabilityCheck(getTodayString(), failedTasks, activeTasks);
   if (res) {
     if (res.shielded) {
       logEl.innerHTML = `
@@ -785,10 +797,24 @@ async function handleTestAccountabilityPost() {
         <div style="color: #cbd5e1; margin-top: 4px;">A Streak Freeze was consumed to protect your ${currentUser.streak || 0}-day streak. Facebook post skipped.</div>
       `;
     } else {
+      const failedListHtml = failedTasks.length > 0 
+        ? failedTasks.map(t => `<div style="color: #fca5a5; font-size: 0.8rem; margin: 2px 0;">❌ [Incomplete] ${escapeHtml(t.text || t)}</div>`).join('')
+        : `<div style="color: #cbd5e1; font-size: 0.8rem;">❌ All pending habits marked unfulfilled</div>`;
+
       logEl.innerHTML = `
-        <div style="color: #f87171; font-weight: 700;">🚨 GRAPH API ACCOUNTABILITY TRIGGERED!</div>
-        <div style="color: #fed7aa; margin-top: 4px;">&ldquo;This person made this commitment but did not complete it.&rdquo;</div>
-        <div style="color: #94a3b8; font-size: 0.76rem; margin-top: 4px;">User: ${currentUser.name} | Page: Habitism (ID: 1496888330165860) | Response: 200 OK</div>
+        <div style="color: #f87171; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          <span>🚨</span>
+          <span>FACEBOOK ACCOUNTABILITY POST TRIGGERED!</span>
+        </div>
+        <div style="margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.4); border-radius: 8px; border-left: 3px solid #f87171;">
+          <div style="font-weight: 700; color: #fed7aa; margin-bottom: 4px;">&ldquo;This person made this commitment but did not complete it.&rdquo;</div>
+          <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 6px;">Target Page: <strong>Habitism</strong> (ID: 1496888330165860) &bull; User: <strong>${escapeHtml(currentUser.name)}</strong></div>
+          <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
+            <div style="font-size: 0.76rem; color: #e2e8f0; font-weight: 600; margin-bottom: 2px;">Highlighted Unfulfilled Habits:</div>
+            ${failedListHtml}
+          </div>
+        </div>
+        <div style="color: #f87171; font-size: 0.76rem; margin-top: 6px;">Penalty Applied: Daily streak reset to 0 days.</div>
       `;
     }
     updateStreak();
@@ -928,6 +954,134 @@ function showGlobalTooltip(targetBtn, text) {
 function hideGlobalTooltip() {
   if (globalTooltipEl) {
     globalTooltipEl.classList.remove("active");
+  }
+}
+
+
+// -------------------------------------------------------------
+// 🧭 RESPONSIVE NAVBAR PROGRESSIVE OVERFLOW ENGINE
+// -------------------------------------------------------------
+function initNavbarOverflowEngine() {
+  const navToggle = document.getElementById("navOverflowToggle");
+  const navDropdown = document.getElementById("navOverflowDropdown");
+  const navActions = document.getElementById("navActions");
+  const navbar = document.querySelector(".navbar");
+
+  if (!navToggle || !navDropdown || !navActions || !navbar) return;
+
+  // Toggle overflow dropdown
+  navToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = navDropdown.classList.contains("open");
+    navDropdown.classList.toggle("open", !isOpen);
+    navToggle.setAttribute("aria-expanded", String(!isOpen));
+  });
+
+  // Close dropdown on click outside
+  document.addEventListener("click", (e) => {
+    if (!navDropdown.classList.contains("open")) return;
+    if (navToggle.contains(e.target) || navDropdown.contains(e.target)) return;
+    navDropdown.classList.remove("open");
+    navToggle.setAttribute("aria-expanded", "false");
+  });
+
+  // Close dropdown when any item inside is clicked
+  navDropdown.addEventListener("click", () => {
+    navDropdown.classList.remove("open");
+    navToggle.setAttribute("aria-expanded", "false");
+  });
+
+  // Sync admin item visibility in dropdown
+  const adminDropdownItem = document.getElementById("overflowItemAdmin");
+  if (adminDropdownItem) {
+    if (currentUser && currentUser.role === "admin") {
+      adminDropdownItem.classList.add("is-admin");
+    } else {
+      adminDropdownItem.classList.remove("is-admin");
+    }
+  }
+
+  // Initial evaluation
+  evaluateNavbarOverflow();
+
+  // Re-evaluate on window resize
+  window.addEventListener("resize", () => {
+    evaluateNavbarOverflow();
+  });
+}
+
+function evaluateNavbarOverflow() {
+  const navActions = document.getElementById("navActions");
+  const navbar = document.querySelector(".navbar");
+  if (!navActions || !navbar) return;
+
+  // If on cellphone screen (<= 640px), clear all collapse stages
+  if (window.innerWidth <= 640) {
+    navActions.classList.remove("collapse-stage-1", "collapse-stage-2", "collapse-stage-3", "collapse-stage-4");
+    return;
+  }
+
+  // Margin safety threshold from the right edge
+  const screenEdgeMargin = 22;
+  const navbarRect = navbar.getBoundingClientRect();
+  const maxRightBound = Math.min(window.innerWidth - screenEdgeMargin, navbarRect.right - screenEdgeMargin);
+
+  const btnLogout = document.getElementById("navBtnLogout");
+  const btnAccountability = document.getElementById("navBtnAccountability");
+  const btnMode = document.getElementById("navBtnMode");
+  const btnCert = document.getElementById("navBtnCert");
+  const overflowToggle = document.getElementById("navOverflowToggle");
+  const overflowMenu = document.getElementById("navOverflowMenu");
+
+  function isOver(el) {
+    if (!el || el.offsetParent === null) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.right > maxRightBound;
+  }
+
+  // Step 0: Test stage 0 (all buttons visible)
+  navActions.classList.remove("collapse-stage-1", "collapse-stage-2", "collapse-stage-3", "collapse-stage-4");
+
+  const logoutRect = btnLogout ? btnLogout.getBoundingClientRect() : null;
+  const isOverflowStage1 = logoutRect ? (logoutRect.right > maxRightBound || navActions.scrollWidth > navActions.clientWidth) : false;
+
+  if (!isOverflowStage1) {
+    // Fits perfectly! Stage 0
+    return;
+  }
+
+  // Step 1: Collapse Log Out (and Admin) -> Show Hamburger Menu
+  navActions.classList.add("collapse-stage-1");
+
+  // If the hamburger icon itself or Accountability button does not fit comfortably,
+  // immediately include the Accountability button in the hamburger icon (Stage 2)
+  const isToggleOver1 = isOver(overflowToggle) || isOver(overflowMenu) || (navActions.scrollWidth > navActions.clientWidth);
+  const isAccOver = isOver(btnAccountability);
+
+  if (isToggleOver1 || isAccOver) {
+    // Step 2: Collapse Accountability + Log Out into hamburger icon
+    navActions.classList.remove("collapse-stage-1");
+    navActions.classList.add("collapse-stage-2");
+
+    // Check if hamburger icon or Mode overflows in Stage 2
+    const isToggleOver2 = isOver(overflowToggle) || isOver(overflowMenu) || (navActions.scrollWidth > navActions.clientWidth);
+    const isModeOver = isOver(btnMode);
+
+    if (isToggleOver2 || isModeOver) {
+      // Step 3: Collapse Mode + Accountability + Log Out into hamburger icon
+      navActions.classList.remove("collapse-stage-2");
+      navActions.classList.add("collapse-stage-3");
+
+      // Check if hamburger icon or Certificate overflows in Stage 3
+      const isToggleOver3 = isOver(overflowToggle) || isOver(overflowMenu) || (navActions.scrollWidth > navActions.clientWidth);
+      const isCertOver = isOver(btnCert);
+
+      if (isToggleOver3 || isCertOver) {
+        // Step 4: Collapse Certificate + Mode + Accountability + Log Out into hamburger icon
+        navActions.classList.remove("collapse-stage-3");
+        navActions.classList.add("collapse-stage-4");
+      }
+    }
   }
 }
 
