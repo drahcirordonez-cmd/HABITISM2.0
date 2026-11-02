@@ -26,7 +26,7 @@ app.use(express.static(__dirname));
 // ============================================================================
 // 1. DATABASE INITIALIZATION & SCHEMA
 // ============================================================================
-const dbPath = path.join(__dirname, 'habitism.db');
+const dbPath = path.join('/data', 'habitism.db');
 const db = new DatabaseSync(dbPath);
 
 // Initialize Tables
