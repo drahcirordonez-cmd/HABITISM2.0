@@ -42,9 +42,11 @@ db.exec(`
     facebook_name TEXT,
     committed INTEGER DEFAULT 0,
     coins INTEGER DEFAULT 100,
+    piggybank_coins INTEGER DEFAULT 0,
     streak INTEGER DEFAULT 0,
     streak_freezes INTEGER DEFAULT 1,
     task_mode TEXT DEFAULT 'presets',
+    deadline_time TEXT DEFAULT '23:59',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -95,6 +97,8 @@ db.exec(`
 try { db.exec(`ALTER TABLE users ADD COLUMN username TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN facebook_name TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN piggybank_coins INTEGER DEFAULT 0;`); } catch (e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN deadline_time TEXT DEFAULT '23:59';`); } catch (e) {}
 
 console.log('✅ SQLite Database initialized at habitism.db');
 
@@ -411,10 +415,11 @@ app.get('/api/user/state/get/:userId/:stateKey', (req, res) => {
 });
 
 // --- Habit Tracking & Progress ---
-app.post('/api/habits/save-day', (req, res) => {
-  const { userId, dateStr, completedCount, totalCount } = req.body;
+app.post('/api/habits/save-day', async (req, res) => {
+  const { userId, dateStr, completedCount, totalCount, failedTasks, allTasks } = req.body;
   if (!userId || !dateStr) return res.status(400).json({ error: 'Missing required parameters.' });
 
+  // Save daily log
   db.prepare(`
     INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
     VALUES (?, ?, ?, ?, ?)
@@ -424,15 +429,88 @@ app.post('/api/habits/save-day', (req, res) => {
       status = excluded.status
   `).run(userId, dateStr, completedCount, totalCount, completedCount >= 5 ? 'completed' : 'in_progress');
 
-  let user = db.prepare('SELECT id, coins, streak FROM users WHERE id = ?').get(userId);
-  if (completedCount >= 5) {
-    const updatedCoins = user.coins + 10;
+  let user = db.prepare('SELECT id, coins, streak, streak_freezes FROM users WHERE id = ?').get(userId);
+
+  let penaltyResult = null;
+
+  if (completedCount < totalCount) {
+    // Incomplete day — check streak freeze
+    if (user.streak_freezes > 0) {
+      db.prepare('UPDATE users SET streak_freezes = streak_freezes - 1 WHERE id = ?').run(userId);
+      user = db.prepare('SELECT id, coins, streak FROM users WHERE id = ?').get(userId);
+      penaltyResult = { shielded: true, message: 'Streak freeze used! No Facebook post published.' };
+    } else {
+      // No freeze — reset streak and post to Facebook
+      db.prepare('UPDATE users SET streak = 0 WHERE id = ?').run(userId);
+      user = db.prepare('SELECT id, coins, streak FROM users WHERE id = ?').get(userId);
+
+      // Get user details for FB post
+      const userDetails = db.prepare('SELECT id, name, username, email, facebook_name FROM users WHERE id = ?').get(userId);
+
+      // Trigger Facebook accountability post
+      penaltyResult = await triggerFacebookAccountabilityPost(
+        userDetails.id,
+        userDetails.name,
+        dateStr,
+        userDetails.facebook_name,
+        failedTasks || [],
+        allTasks || []
+      );
+    }
+  } else {
+    // Completed day — reward goes to piggybank first (claimable at end of day)
+    const updatedPiggybank = (user.piggybank_coins || 0) + 10;
     const updatedStreak = user.streak + 1;
-    db.prepare('UPDATE users SET coins = ?, streak = ? WHERE id = ?').run(updatedCoins, updatedStreak, userId);
-    user = db.prepare('SELECT id, coins, streak FROM users WHERE id = ?').get(userId);
+    db.prepare('UPDATE users SET piggybank_coins = ?, streak = ? WHERE id = ?').run(updatedPiggybank, updatedStreak, userId);
+    user = db.prepare('SELECT id, coins, piggybank_coins, streak FROM users WHERE id = ?').get(userId);
   }
 
-  return res.json({ success: true, user });
+  return res.json({
+    success: true,
+    user,
+    incomplete: completedCount < totalCount,
+    penalty: penaltyResult
+  });
+});
+
+
+// --- Sync Piggybank (client updates server piggybank on each toggle) ---
+app.post('/api/user/piggybank/sync', (req, res) => {
+  const { userId, piggybankCoins } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId.' });
+  if (piggybankCoins === undefined) return res.status(400).json({ error: 'Missing piggybankCoins.' });
+
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  db.prepare('UPDATE users SET piggybank_coins = ? WHERE id = ?').run(Math.max(0, piggybankCoins), userId);
+
+  return res.json({ success: true, piggybank_coins: Math.max(0, piggybankCoins) });
+});
+
+// --- Claim Piggybank (move piggybank coins to main counter at end of day) ---
+app.post('/api/user/claim-piggybank', (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId.' });
+
+  const user = db.prepare('SELECT id, coins, piggybank_coins FROM users WHERE id = ?').get(userId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  const piggybank = user.piggybank_coins || 0;
+  if (piggybank <= 0) {
+    return res.json({ success: true, coins: user.coins, piggybank_coins: 0, claimed: 0, message: 'Nothing to claim.' });
+  }
+
+  const newCoins = user.coins + piggybank;
+  db.prepare('UPDATE users SET coins = ?, piggybank_coins = 0 WHERE id = ?').run(newCoins, userId);
+
+  return res.json({
+    success: true,
+    coins: newCoins,
+    piggybank_coins: 0,
+    claimed: piggybank,
+    message: `Claimed ${piggybank} coins from piggybank!`
+  });
 });
 
 // --- Shop: Buy Streak Freeze ---
@@ -636,8 +714,253 @@ app.get('/api/admin/accountability-feed', (req, res) => {
 });
 
 // ============================================================================
-// 5. START SERVER
+// ADMIN: Add / Remove Streak Freezes for a user
 // ============================================================================
+app.post('/api/admin/users/:targetUserId/streak-freeze', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const targetId = req.params.targetUserId;
+  const { amount } = req.body;
+  if (amount === undefined || amount === null) {
+    return res.status(400).json({ error: 'Amount is required.' });
+  }
+
+  const user = db.prepare('SELECT id, username, streak_freezes FROM users WHERE id = ?').get(targetId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  const newFreezes = Math.max(0, (user.streak_freezes || 0) + amount);
+  db.prepare('UPDATE users SET streak_freezes = ? WHERE id = ?').run(newFreezes, targetId);
+
+  return res.json({
+    success: true,
+    userId: targetId,
+    username: user.username,
+    streakFreezes: newFreezes,
+    message: amount > 0
+      ? `Added ${amount} streak freeze(s) to ${user.username}.`
+      : amount < 0
+      ? `Removed ${Math.abs(amount)} streak freeze(s) from ${user.username}.`
+      : `Streak freeze count for ${user.username} unchanged.`
+  });
+});
+
+// ============================================================================
+// ADMIN: Add / Lessen Gold (Coins) for a user
+// ============================================================================
+app.post('/api/admin/users/:targetUserId/coins', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const targetId = req.params.targetUserId;
+  const { amount } = req.body;
+  if (amount === undefined || amount === null) {
+    return res.status(400).json({ error: 'Amount is required.' });
+  }
+
+  const user = db.prepare('SELECT id, username, coins FROM users WHERE id = ?').get(targetId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  const newCoins = Math.max(0, (user.coins || 0) + amount);
+  db.prepare('UPDATE users SET coins = ? WHERE id = ?').run(newCoins, targetId);
+
+  return res.json({
+    success: true,
+    userId: targetId,
+    username: user.username,
+    coins: newCoins,
+    message: amount > 0
+      ? `Added ${amount} coins to ${user.username}.`
+      : amount < 0
+      ? `Removed ${Math.abs(amount)} coins from ${user.username}.`
+      : `Coin balance for ${user.username} unchanged.`
+  });
+});
+
+// ============================================================================
+// ADMIN: Manage Streak for a user
+// ============================================================================
+app.post('/api/admin/users/:targetUserId/streak', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const targetId = req.params.targetUserId;
+  const { streak } = req.body;
+  if (streak === undefined || streak === null || isNaN(streak)) {
+    return res.status(400).json({ error: 'Valid streak value is required.' });
+  }
+
+  const user = db.prepare('SELECT id, username, streak FROM users WHERE id = ?').get(targetId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  db.prepare('UPDATE users SET streak = ? WHERE id = ?').run(streak, targetId);
+
+  return res.json({
+    success: true,
+    userId: targetId,
+    username: user.username,
+    streak: parseInt(streak),
+    message: `Streak for ${user.username} set to ${streak} days.`
+  });
+});
+
+// ============================================================================
+// ADMIN: Manage User's Calendar (daily log) for a specific date
+// ============================================================================
+app.post('/api/admin/users/:targetUserId/calendar', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const targetId = req.params.targetUserId;
+  const { dateStr, completedCount, totalCount, status } = req.body;
+  if (!dateStr) {
+    return res.status(400).json({ error: 'dateStr is required.' });
+  }
+
+  const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(targetId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  db.prepare(`
+    INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, date_str) DO UPDATE SET
+      completed_count = excluded.completed_count,
+      total_count = excluded.total_count,
+      status = excluded.status
+  `).run(targetId, dateStr, completedCount || 0, totalCount || 0, status || 'in_progress');
+
+  return res.json({
+    success: true,
+    userId: targetId,
+    username: user.username,
+    dateStr,
+    completedCount: completedCount || 0,
+    totalCount: totalCount || 0,
+    status: status || 'in_progress',
+    message: `Calendar updated for ${user.username} on ${dateStr}.`
+  });
+});
+
+// ============================================================================
+// ADMIN: Manually post Facebook accountability punishment for a user
+// ============================================================================
+app.post('/api/admin/accountability/post', async (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const { userId, dateStr, failedTasks, allTasks, message } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required.' });
+  }
+
+  const user = db.prepare('SELECT id, name, username, email, streak, streak_freezes, facebook_id, facebook_name FROM users WHERE id = ?').get(userId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  if ((user.streak_freezes || 0) > 0) {
+    db.prepare('UPDATE users SET streak_freezes = streak_freezes - 1 WHERE id = ?').run(userId);
+    return res.json({
+      success: true,
+      shielded: true,
+      message: `${user.name} has a streak freeze. Freeze consumed, no Facebook post published.`
+    });
+  }
+
+  db.prepare('UPDATE users SET streak = 0 WHERE id = ?').run(userId);
+
+  const fbResult = await triggerFacebookAccountabilityPost(
+    user.id,
+    user.name,
+    dateStr || new Date().toDateString(),
+    user.facebook_name,
+    failedTasks || [],
+    allTasks || [],
+    message || 'This person made this commitment on Habitism but did not complete it.'
+  );
+
+  return res.json({
+    success: true,
+    shielded: false,
+    streakReset: true,
+    facebookResult: fbResult,
+    message: `Facebook accountability posted for ${user.name}. Streak reset to 0.`
+  });
+});
+
+// ============================================================================
+// ADMIN: Delete a Facebook accountability punishment post
+// ============================================================================
+app.delete('/api/admin/accountability/:postId', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const postId = req.params.postId;
+  const post = db.prepare('SELECT id FROM accountability_posts WHERE id = ?').get(postId);
+  if (!post) return res.status(404).json({ error: 'Accountability post not found.' });
+
+  db.prepare('DELETE FROM accountability_posts WHERE id = ?').run(postId);
+
+  return res.json({
+    success: true,
+    message: `Accountability post #${postId} deleted.`
+  });
+});
+
+// ============================================================================
+// ADMIN: Change Deadline (per-user or global default)
+// ============================================================================
+app.post('/api/admin/settings/deadline', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const { targetUserId, deadlineTime } = req.body;
+  if (!deadlineTime) {
+    return res.status(400).json({ error: 'deadlineTime is required (HH:MM format).' });
+  }
+
+  if (!/^\d{2}:\d{2}$/.test(deadlineTime)) {
+    return res.status(400).json({ error: 'Invalid deadline format. Use HH:MM.' });
+  }
+
+  const [hours, minutes] = deadlineTime.split(':').map(Number);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return res.status(400).json({ error: 'Invalid deadline time. Hours 0-23, minutes 0-59.' });
+  }
+
+  if (targetUserId) {
+    const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(targetUserId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    db.prepare('UPDATE users SET deadline_time = ? WHERE id = ?').run(deadlineTime, targetUserId);
+    return res.json({
+      success: true,
+      userId: targetUserId,
+      username: user.username,
+      deadlineTime,
+      message: `Deadline for ${user.username} set to ${deadlineTime}.`
+    });
+  }
+
+  db.prepare(`UPDATE users SET deadline_time = ? WHERE deadline_time = '23:59'`).run(deadlineTime);
+  return res.json({
+    success: true,
+    deadlineTime,
+    message: `Default deadline set to ${deadlineTime} for all users without a custom deadline.`
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`🌸 Habitism Server running at http://localhost:${PORT}`);
   console.log(`📘 Facebook Page configured: ${FB_CONFIG.pageName} (ID: ${FB_CONFIG.pageId})`);

@@ -165,6 +165,14 @@
             <span>⚡</span>
             <span>Trigger Test Post</span>
           </button>
+          <button type="button" class="admin-btn admin-btn-secondary" onclick="postFacebookPunishment()">
+            <span>📢</span>
+            <span>Post Punishment</span>
+          </button>
+          <button type="button" class="admin-btn admin-btn-secondary" onclick="setUserDeadline()">
+            <span>⏰</span>
+            <span>Set Deadline</span>
+          </button>
         </div>
       </div>
 
@@ -178,11 +186,12 @@
               <th>API Status</th>
               <th>Post ID</th>
               <th>Published Accountability Message</th>
+              <th style="width: 60px;">Action</th>
             </tr>
           </thead>
           <tbody id="accountabilityTableBody">
             <tr>
-              <td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">
+              <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
                 Loading Facebook Graph API activity log...
               </td>
             </tr>

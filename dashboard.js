@@ -188,6 +188,11 @@ let currentCalendarDate = new Date();
 let currentLevelIndex = 0;
 let activeTaskMode = "presets"; // 'presets' (Option B) or 'custom' (Option A)
 
+// Commitment System State
+let committedListId = null;      // 'lvl_N' or 'custom'
+let committedDate = null;        // date string of the commitment
+let committedLevelIndex = null;  // level index at time of commitment
+
 function getTodayString() {
   return new Date().toDateString();
 }
@@ -212,8 +217,12 @@ function setDayCompletedCount(dateString, count) {
     localStorage.setItem(k, count.toString());
   }
 
-  // Sync to database
+    // Sync to database
   if (currentUser && currentUser.id) {
+    const activeTasks = getActiveTasks();
+    const completedTaskTexts = getCompletedTaskTextsForToday(); // You need to implement this helper
+    const failedTasks = activeTasks.filter(t => !completedTaskTexts.includes(typeof t === 'string' ? t : (t.text || t.title)));
+    
     fetch(`${Habitism.API_BASE}/api/habits/save-day`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -221,9 +230,218 @@ function setDayCompletedCount(dateString, count) {
         userId: currentUser.id,
         dateStr: dateString,
         completedCount: count,
-        totalCount: getActiveTasks().length
+        totalCount: activeTasks.length,
+        failedTasks: failedTasks.map(t => typeof t === 'string' ? t : (t.text || t.title)),
+        allTasks: activeTasks.map(t => typeof t === 'string' ? t : (t.text || t.title))
       })
+    }).then(async (res) => {
+      const data = await res.json();
+      if (data.penalty && !data.penalty.shielded && data.penalty.success) {
+        // Notify user that Facebook post was published
+        alert(`📢 Facebook Accountability Post Published!\n\n${data.penalty.formattedMessage}\n\nYour streak has been reset to 0.`);
+      } else if (data.penalty && data.penalty.shielded) {
+        alert(`❄️ Streak Freeze used! Your streak was saved. No Facebook post was published.`);
+      }
     }).catch(() => {});
+  }
+}
+
+// -------------------------------------------------------------
+// 📝 Helper: Get completed task texts for today
+// -------------------------------------------------------------
+function getCompletedTaskTextsForToday() {
+  const checks = getActiveChecks();
+  const tasks = getActiveTasks();
+  const completedTexts = [];
+  checks.forEach((completed, index) => {
+    if (completed) {
+      const task = tasks[index];
+      completedTexts.push(typeof task === 'string' ? task : (task.text || task.title));
+    }
+  });
+  return completedTexts;
+}
+
+// -------------------------------------------------------------
+// 🤝 COMMITMENT SYSTEM
+// -------------------------------------------------------------
+function getCommitmentKey() {
+  return userKey(`commitment_${getTodayString()}`);
+}
+
+function getCommitmentStorage() {
+  const saved = localStorage.getItem(getCommitmentKey());
+  if (saved) {
+    try { return JSON.parse(saved); } catch (e) {}
+  }
+  return null;
+}
+
+function saveCommitmentStorage(data) {
+  if (data === null) {
+    localStorage.removeItem(getCommitmentKey());
+  } else {
+    localStorage.setItem(getCommitmentKey(), JSON.stringify(data));
+  }
+  // Sync to server
+  if (currentUser && currentUser.id) {
+    Habitism.setUserStorage(`commitment_${getTodayString()}`, data).catch(() => {});
+  }
+}
+
+function getCommitmentListId() {
+  const stored = getCommitmentStorage();
+  if (stored && stored.date === getTodayString()) {
+    committedListId = stored.listId;
+    committedDate = stored.date;
+    committedLevelIndex = stored.levelIndex;
+    return stored;
+  }
+  // Reset if commitment is from a different day
+  committedListId = null;
+  committedDate = null;
+  committedLevelIndex = null;
+  return null;
+}
+
+function commitToList(listId, levelIndex) {
+  const previousListId = committedListId;
+  const today = getTodayString();
+
+  committedListId = listId;
+  committedDate = today;
+  committedLevelIndex = levelIndex;
+
+  saveCommitmentStorage({ listId, date: today, levelIndex });
+
+  // Show message if switching from a previous commitment
+  if (previousListId && previousListId !== listId) {
+    const prevLabel = previousListId === 'custom' ? 'Custom List' : `Level ${previousListId.replace('lvl_', '')}`;
+    const currLabel = listId === 'custom' ? 'Custom List' : `Level ${listId.replace('lvl_', '')}`;
+    showToast(`🔄 Commitment switched from ${prevLabel} to ${currLabel}. Previous commitment released.`);
+  } else {
+    const currLabel = listId === 'custom' ? 'Custom List' : `Level ${listId.replace('lvl_', '')}`;
+    showToast(`📌 Committed to ${currLabel} for today! Complete it to lock in your calendar glow.`);
+  }
+
+  updateCommitmentUI();
+  renderChecklist();
+  renderCalendar(currentCalendarDate);
+}
+
+function removeCommitment() {
+  if (!committedListId) {
+    showToast("ℹ️ No active commitment to remove.");
+    return;
+  }
+
+  const removedLabel = committedListId === 'custom' ? 'Custom List' : `Level ${committedListId.replace('lvl_', '')}`;
+  committedListId = null;
+  committedDate = null;
+  committedLevelIndex = null;
+
+  saveCommitmentStorage(null);
+  updateCommitmentUI();
+  renderChecklist();
+  renderCalendar(currentCalendarDate);
+  showToast(`❌ Commitment to ${removedLabel} removed. You can now commit to a different list.`);
+}
+
+function commitToCurrentList() {
+  const today = getTodayString();
+  let listId, levelIndex;
+
+  if (activeTaskMode === 'custom') {
+    listId = 'custom';
+    levelIndex = null;
+  } else {
+    listId = `lvl_${DEVELOPER_LEVELS[currentLevelIndex].id}`;
+    levelIndex = currentLevelIndex;
+  }
+
+  commitToList(listId, levelIndex);
+}
+
+async function claimPiggybank() {
+  const user = Habitism.getCurrentUser();
+  if (!user || !user.id) {
+    showToast("⚠️ Please log in to claim piggybank coins.");
+    return;
+  }
+
+  try {
+    const res = await Habitism.claimPiggybank(user.id);
+    if (res.success) {
+      // Update local user object
+      const currentUser = Habitism.getCurrentUser();
+      if (currentUser) {
+        currentUser.coins = res.coins;
+        currentUser.piggybank_coins = res.piggybank_coins;
+        Habitism.setCurrentUser(currentUser);
+      }
+      updateNavbarBadges();
+      updatePiggybankDisplay();
+      showToast(`💰 Claimed ${res.claimed} coins from piggybank! Total: ${res.coins}`);
+    } else {
+      showToast(res.message || "Nothing to claim.");
+    }
+  } catch (err) {
+    showToast("❌ Failed to claim piggybank coins.");
+    console.error(err);
+  }
+}
+
+function updatePiggybankDisplay() {
+  const user = Habitism.getCurrentUser();
+  const balanceEl = document.getElementById("piggybankBalance");
+  if (balanceEl && user) {
+    balanceEl.innerText = user.piggybank_coins || 0;
+  }
+}
+
+function getCommitmentGlowCount() {
+  // Returns the completed count for the committed list today, or 0 if no commitment
+  if (!committedListId || committedDate !== getTodayString()) return 0;
+
+  // Build the key based on the committed list
+  let checksKey;
+  if (committedListId === 'custom') {
+    checksKey = userKey(`custom_checks_${getTodayString()}`);
+  } else {
+    const levelId = committedListId.replace('lvl_', '');
+    checksKey = userKey(`checks_${levelId}_${getTodayString()}`);
+  }
+
+  const saved = localStorage.getItem(checksKey);
+  if (!saved) return 0;
+  try {
+    const checks = JSON.parse(saved);
+    return Object.values(checks).filter(Boolean).length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function updateCommitmentUI() {
+  const commitBtn = document.getElementById("btnCommit");
+  const removeBtn = document.getElementById("btnRemoveCommitment");
+  const commitmentLabel = document.getElementById("commitmentLabel");
+
+  if (!commitBtn || !removeBtn || !commitmentLabel) return;
+
+  const today = getTodayString();
+  const hasCommitment = committedListId && committedDate === today;
+
+  if (hasCommitment) {
+    const label = committedListId === 'custom' ? 'Custom List' : `Level ${committedListId.replace('lvl_', '')}`;
+    commitmentLabel.innerText = `Committed: ${label}`;
+    commitmentLabel.style.display = "block";
+    commitBtn.style.display = "none";
+    removeBtn.style.display = "inline-block";
+  } else {
+    commitmentLabel.style.display = "none";
+    commitBtn.style.display = "inline-block";
+    removeBtn.style.display = "none";
   }
 }
 
@@ -260,7 +478,16 @@ function renderCalendar(date) {
       classes += "today ";
     }
 
-    const completedCount = getDayCompletedCount(cellDate);
+    // Use commitment-based glow for today, otherwise use stored day count
+    let completedCount;
+    const todayStr = getTodayString();
+    if (cellDate === todayStr) {
+      // Today: use commitment glow if committed, otherwise stored count
+      const commitmentCount = getCommitmentGlowCount();
+      completedCount = commitmentCount > 0 ? commitmentCount : getDayCompletedCount(cellDate);
+    } else {
+      completedCount = getDayCompletedCount(cellDate);
+    }
 
     // Dynamic Calendar Highlight Tiers:
     // 8+ -> bright white-blue
@@ -516,6 +743,7 @@ function renderChecklist() {
 
   // 6. Update Calendar Tier for Today
   setDayCompletedCount(getTodayString(), completedToday);
+  updateCommitmentUI();
   renderCalendar(currentCalendarDate);
 }
 
@@ -525,14 +753,31 @@ function toggleTask(index) {
   checks[index] = !wasCompleted;
   saveActiveChecks(checks);
 
-  // If marked completed, reward user with coins!
-  if (!wasCompleted) {
-    Habitism.addCoins(10);
-    showToast("✨ Habit completed! +10 Habit Coins 🪙");
+  // Piggybank logic: +10 on check, -10 on uncheck (no double-counting)
+  const currentUser = Habitism.getCurrentUser();
+  if (currentUser && currentUser.id) {
+    if (!wasCompleted) {
+      // Checked: add 10 to piggybank
+      const newPiggy = (currentUser.piggybank_coins || 0) + 10;
+      currentUser.piggybank_coins = newPiggy;
+      Habitism.setCurrentUser(currentUser);
+      Habitism.syncPiggybank(currentUser.id, newPiggy).catch(() => {});
+      showToast("✨ Habit completed! +10 Habit Coins 🪙 (Piggybank)");
+    } else {
+      // Unchecked: deduct 10 from piggybank
+      const currentPiggybank = currentUser.piggybank_coins || 0;
+      const newPiggybank = Math.max(0, currentPiggybank - 10);
+      currentUser.piggybank_coins = newPiggybank;
+      Habitism.setCurrentUser(currentUser);
+      Habitism.syncPiggybank(currentUser.id, newPiggybank).catch(() => {});
+      showToast("➖ Habit unchecked! -10 Habit Coins from piggybank.");
+    }
     updateNavbarBadges();
+    updatePiggybankDisplay();
   }
 
   renderChecklist();
+  renderCalendar(currentCalendarDate);
 }
 
 function addTask(event) {
@@ -609,6 +854,12 @@ function updateNavbarBadges() {
   if (nameEl) nameEl.innerText = currentUser.name || currentUser.username || "Champion";
   if (coinsEl) coinsEl.innerText = currentUser.coins || 0;
   if (freezeEl) freezeEl.innerText = currentUser.streak_freezes || 0;
+
+  // Show piggybank badge in navbar
+  const piggybankEl = document.getElementById("navPiggybank");
+  if (piggybankEl) {
+    piggybankEl.innerText = currentUser.piggybank_coins || 0;
+  }
 
   // Show Admin Portal Button if role is admin
   if (adminBtn) {
@@ -1099,6 +1350,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   loadCurrentLevelIndex();
+
+  // Restore commitment from storage
+  getCommitmentListId();
+
+  // Restore checks from server (fixes persistence bug: checks lost on re-login)
+  if (currentUser && currentUser.id) {
+    Habitism.restoreUserChecks(currentUser.id).then(savedChecks => {
+      if (savedChecks && Object.keys(savedChecks).length > 0) {
+        // Apply saved checks to localStorage for the active mode/level
+        const todayKey = activeTaskMode === "custom"
+          ? userKey(`custom_checks_${getTodayString()}`)
+          : userKey(`checks_${DEVELOPER_LEVELS[currentLevelIndex].id}_${getTodayString()}`);
+        const existing = localStorage.getItem(todayKey);
+        if (!existing) {
+          localStorage.setItem(todayKey, JSON.stringify(savedChecks));
+        }
+      }
+    }).catch(() => {});
+  }
+
   initGlobalTooltip();
   updateNavbarBadges();
 
