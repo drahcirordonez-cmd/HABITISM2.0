@@ -1537,6 +1537,44 @@ function evaluateNavbarOverflow() {
 }
 
 // -------------------------------------------------------------
+// 🌅 DAILY RESET: refresh checks/commitment/locks when a new day starts
+// (checks are stored per calendar day, so a new day is always a clean slate;
+//  this makes an already-open tab roll over at midnight too)
+// -------------------------------------------------------------
+let lastKnownDay = getTodayString();
+
+function handleDayRollover() {
+  const today = getTodayString();
+  if (today === lastKnownDay) return;
+
+  const previousDay = lastKnownDay;
+  lastKnownDay = today;
+
+  // Re-read today's (empty) commitment state; yesterday's is ignored automatically
+  getCommitmentListId();
+
+  // If the calendar was showing the month of the previous day, follow into the new day's month
+  const prev = new Date(previousDay);
+  if (!isNaN(prev) &&
+      currentCalendarDate.getMonth() === prev.getMonth() &&
+      currentCalendarDate.getFullYear() === prev.getFullYear()) {
+    currentCalendarDate = new Date();
+  }
+
+  renderChecklist();
+  renderCalendar(currentCalendarDate);
+  updateCommitmentUI();
+  updateStreak();
+  showToast("🌅 New day! All checkboxes have been reset. Let's go!");
+}
+
+setInterval(handleDayRollover, 15000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) handleDayRollover();
+});
+window.addEventListener("focus", handleDayRollover);
+
+// -------------------------------------------------------------
 // 🚀 INITIALIZATION
 // -------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
