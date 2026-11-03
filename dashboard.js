@@ -327,7 +327,9 @@ function commitToList(listId, levelIndex) {
 
   updateCommitmentUI();
   renderChecklist();
-  renderCalendar(currentCalendarDate);
+
+  // Force calendar re-render with today's date to ensure immediate glow update
+  renderCalendar(new Date());
 }
 
 function removeCommitment() {
