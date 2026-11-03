@@ -445,10 +445,29 @@ function updateCommitmentUI() {
   if (!commitBtn || !removeBtn || !commitmentLabel) return;
 
   const today = getTodayString();
-  const hasCommitment = committedListId && committedDate === today;
+  // Recover from localStorage if JS variable is out of sync
+  let effectiveListId = committedListId;
+  let effectiveDate = committedDate;
+  if (!effectiveListId || effectiveDate !== today) {
+    const stored = localStorage.getItem(getCommitmentKey());
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.listId && parsed.date === today) {
+          effectiveListId = parsed.listId;
+          effectiveDate = parsed.date;
+          committedListId = parsed.listId;
+          committedDate = parsed.date;
+          committedLevelIndex = parsed.levelIndex;
+        }
+      } catch (e) {}
+    }
+  }
+
+  const hasCommitment = effectiveListId && effectiveDate === today;
 
   if (hasCommitment) {
-    const label = committedListId === 'custom' ? 'Custom List' : `Level ${committedListId.replace('lvl_', '')}`;
+    const label = effectiveListId === 'custom' ? 'Custom List' : `Level ${effectiveListId.replace('lvl_', '')}`;
     commitmentLabel.innerText = `Committed: ${label}`;
     commitmentLabel.style.display = "block";
     commitBtn.style.display = "none";
