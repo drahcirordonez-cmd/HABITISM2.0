@@ -26,7 +26,11 @@ app.use(express.static(__dirname));
 // ============================================================================
 // 1. DATABASE INITIALIZATION & SCHEMA
 // ============================================================================
-const dbPath = path.join('/data', 'habitism.db');
+const dataDir = process.env.DATA_DIR || (fs.existsSync('/data') ? '/data' : __dirname);
+if (!fs.existsSync(dataDir)) {
+  try { fs.mkdirSync(dataDir, { recursive: true }); } catch (e) {}
+}
+const dbPath = path.join(dataDir, 'habitism.db');
 const db = new DatabaseSync(dbPath);
 
 // Initialize Tables
@@ -414,62 +418,125 @@ app.get('/api/user/state/get/:userId/:stateKey', (req, res) => {
   return res.json({ success: true, stateValue: row ? JSON.parse(row.state_value) : null });
 });
 
-// --- Habit Tracking & Progress ---
-app.post('/api/habits/save-day', async (req, res) => {
-  const { userId, dateStr, completedCount, totalCount, failedTasks, allTasks } = req.body;
-  if (!userId || !dateStr) return res.status(400).json({ error: 'Missing required parameters.' });
 
-  // Save daily log
-  db.prepare(`
-    INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(user_id, date_str) DO UPDATE SET
-      completed_count = excluded.completed_count,
-      total_count = excluded.total_count,
-      status = excluded.status
-  `).run(userId, dateStr, completedCount, totalCount, completedCount >= 5 ? 'completed' : 'in_progress');
+// --- Calendar & Full State Persistence Across Browsers ---
 
-  let user = db.prepare('SELECT id, coins, streak, streak_freezes FROM users WHERE id = ?').get(userId);
+// 1. Set Calendar Day count (clicked dates or completed tasks)
+app.post('/api/user/calendar/set-day', (req, res) => {
+  const { userId, dateStr, count } = req.body;
+  if (!userId || !dateStr) return res.status(400).json({ error: 'Missing userId or dateStr' });
 
-  let penaltyResult = null;
+  const completedCount = parseInt(count, 10) || 0;
+  const status = completedCount >= 5 ? 'completed' : (completedCount > 0 ? 'in_progress' : 'empty');
 
-  if (completedCount < totalCount) {
-    // Incomplete day — check streak freeze
-    if (user.streak_freezes > 0) {
-      db.prepare('UPDATE users SET streak_freezes = streak_freezes - 1 WHERE id = ?').run(userId);
-      user = db.prepare('SELECT id, coins, streak FROM users WHERE id = ?').get(userId);
-      penaltyResult = { shielded: true, message: 'Streak freeze used! No Facebook post published.' };
-    } else {
-      // No freeze — reset streak and post to Facebook
-      db.prepare('UPDATE users SET streak = 0 WHERE id = ?').run(userId);
-      user = db.prepare('SELECT id, coins, streak FROM users WHERE id = ?').get(userId);
-
-      // Get user details for FB post
-      const userDetails = db.prepare('SELECT id, name, username, email, facebook_name FROM users WHERE id = ?').get(userId);
-
-      // Trigger Facebook accountability post
-      penaltyResult = await triggerFacebookAccountabilityPost(
-        userDetails.id,
-        userDetails.name,
-        dateStr,
-        userDetails.facebook_name,
-        failedTasks || [],
-        allTasks || []
-      );
-    }
+  if (completedCount <= 0) {
+    db.prepare('DELETE FROM daily_logs WHERE user_id = ? AND date_str = ?').run(userId, dateStr);
   } else {
-    // Completed day — reward goes to piggybank first (claimable at end of day)
-    const updatedPiggybank = (user.piggybank_coins || 0) + 10;
-    const updatedStreak = user.streak + 1;
-    db.prepare('UPDATE users SET piggybank_coins = ?, streak = ? WHERE id = ?').run(updatedPiggybank, updatedStreak, userId);
-    user = db.prepare('SELECT id, coins, piggybank_coins, streak FROM users WHERE id = ?').get(userId);
+    db.prepare(`
+      INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
+      VALUES (?, ?, ?, 5, ?)
+      ON CONFLICT(user_id, date_str) DO UPDATE SET
+        completed_count = excluded.completed_count,
+        status = excluded.status
+    `).run(userId, dateStr, completedCount, status);
   }
+
+  // Recalculate streak from continuous completed days
+  const user = db.prepare('SELECT id, coins, streak, streak_freezes, piggybank_coins FROM users WHERE id = ?').get(userId);
+
+  return res.json({
+    success: true,
+    userId,
+    dateStr,
+    completedCount,
+    status
+  });
+});
+
+// 2. Get User's Entire Calendar History
+app.get('/api/user/calendar/:userId', (req, res) => {
+  const userId = req.params.userId;
+  const rows = db.prepare('SELECT date_str, completed_count, total_count, status FROM daily_logs WHERE user_id = ?').all(userId);
+
+  const calendarMap = {};
+  rows.forEach(r => {
+    calendarMap[r.date_str] = r.completed_count;
+  });
+
+  return res.json({
+    success: true,
+    dailyLogs: rows,
+    calendarMap
+  });
+});
+
+// 3. Get User's Full State (Account, Calendar, Checkmarks, Level, Mode)
+app.get('/api/user/full-state/:userId', (req, res) => {
+  const userId = req.params.userId;
+  const user = db.prepare(`
+    SELECT id, name, username, email, role, committed, coins, streak, streak_freezes, piggybank_coins, task_mode, facebook_id, facebook_name 
+    FROM users 
+    WHERE id = ?
+  `).get(userId);
+
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // All daily logs for calendar
+  const dailyLogs = db.prepare('SELECT date_str, completed_count, total_count, status FROM daily_logs WHERE user_id = ?').all(userId);
+  const calendarMap = {};
+  dailyLogs.forEach(r => {
+    calendarMap[r.date_str] = r.completed_count;
+  });
+
+  // All task states (level, mode, custom tasks, checkmarks)
+  const states = db.prepare('SELECT state_key, state_value FROM user_task_states WHERE user_id = ?').all(userId);
+  const taskStates = {};
+  states.forEach(s => {
+    try {
+      taskStates[s.state_key] = JSON.parse(s.state_value);
+    } catch (e) {
+      taskStates[s.state_key] = s.state_value;
+    }
+  });
 
   return res.json({
     success: true,
     user,
-    incomplete: completedCount < totalCount,
-    penalty: penaltyResult
+    dailyLogs,
+    calendarMap,
+    taskStates
+  });
+});
+
+// --- Habit Tracking & Progress ---
+app.post('/api/habits/save-day', async (req, res) => {
+  const { userId, dateStr, completedCount, totalCount } = req.body;
+  if (!userId || !dateStr) return res.status(400).json({ error: 'Missing required parameters.' });
+
+  const count = parseInt(completedCount, 10) || 0;
+  const total = parseInt(totalCount, 10) || 0;
+  const status = count >= 5 ? 'completed' : (count > 0 ? 'in_progress' : 'empty');
+
+  if (count <= 0) {
+    db.prepare('DELETE FROM daily_logs WHERE user_id = ? AND date_str = ?').run(userId, dateStr);
+  } else {
+    db.prepare(`
+      INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, date_str) DO UPDATE SET
+        completed_count = excluded.completed_count,
+        total_count = excluded.total_count,
+        status = excluded.status
+    `).run(userId, dateStr, count, total, status);
+  }
+
+  let user = db.prepare('SELECT id, coins, piggybank_coins, streak, streak_freezes FROM users WHERE id = ?').get(userId);
+
+  return res.json({
+    success: true,
+    user,
+    completedCount: count,
+    status
   });
 });
 

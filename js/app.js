@@ -428,9 +428,10 @@ const Habitism = (() => {
   function addCoins(amount) {
     const user = getCurrentUser();
     if (!user) return;
-    user.coins = (user.coins || 0) + amount;
+    // Route coins to piggybank first (claimable at end of day)
+    user.piggybank_coins = (user.piggybank_coins || 0) + amount;
     setCurrentUser(user);
-    return user.coins;
+    return user.piggybank_coins;
   }
 
   // ==========================================================================
@@ -488,6 +489,46 @@ const Habitism = (() => {
   }
 
   // ==========================================================================
+  
+  // --------------------------------------------------------------------------
+  // Calendar & Full State Cloud Persistence
+  // --------------------------------------------------------------------------
+  async function getUserFullState(userId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/user/full-state/${userId}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.warn('Could not fetch full state from server:', e.message);
+      return null;
+    }
+  }
+
+  async function getUserCalendar(userId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/user/calendar/${userId}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.warn('Could not fetch calendar from server:', e.message);
+      return null;
+    }
+  }
+
+  async function setUserCalendarDay(userId, dateStr, count) {
+    try {
+      const res = await fetch(`${API_BASE}/api/user/calendar/set-day`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, dateStr, count })
+      });
+      return await res.json();
+    } catch (e) {
+      console.warn('Could not save calendar day to server:', e.message);
+      return null;
+    }
+  }
+
   // 6. Admin API Helpers
   // ==========================================================================
   async function adminGetUsers() {
@@ -638,6 +679,156 @@ const Habitism = (() => {
     }
   }
 
+  async function adminCoins(targetUserId, amount) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/users/${targetUserId}/coins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
+        body: JSON.stringify({ amount })
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating admin coins:', err.message);
+      return { success: true, message: 'Coins updated (simulated mode).' };
+    }
+  }
+
+  async function adminPostPunishment(userId, dateStr, failedTasks, allTasks, message) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/accountability/post`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
+        body: JSON.stringify({ userId, dateStr, failedTasks, allTasks, message })
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating admin post punishment:', err.message);
+      return { success: true, message: 'Punishment posted (simulated mode).' };
+    }
+  }
+
+  async function adminDeletePunishment(postId) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/accountability/${postId}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-id': user.id }
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating admin delete punishment:', err.message);
+      return { success: true, message: 'Punishment deleted (simulated mode).' };
+    }
+  }
+
+  async function adminSetDeadline(targetUserId, deadlineTime) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/settings/deadline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
+        body: JSON.stringify({ targetUserId, deadlineTime })
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating admin deadline:', err.message);
+      return { success: true, message: 'Deadline updated (simulated mode).' };
+    }
+  }
+
+  async function syncPiggybank(userId, piggybankCoins) {
+    const user = getCurrentUser();
+    if (!user) throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/user/piggybank/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, piggybankCoins })
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating piggybank sync:', err.message);
+      return { success: true, piggybank_coins: piggybankCoins };
+    }
+  }
+
+  async function claimPiggybank(userId) {
+    const user = getCurrentUser();
+    if (!user) throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/user/claim-piggybank`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating claim piggybank:', err.message);
+      return { success: true, coins: user.coins, claimed: 0, message: 'Piggybank claimed (simulated mode).' };
+    }
+  }
+
+  async function restoreUserChecks(userId) {
+    // Checks are already synced to server via setUserStorage on every toggle.
+    // On login, localStorage already has the user's checks (scoped by user ID via getUserKey).
+    // Return empty so the dashboard uses whatever is already in localStorage.
+    return {};
+  }
+
+  async function adminCalendar(targetUserId, dateStr, completedCount, totalCount, status) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/users/${targetUserId}/calendar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
+        body: JSON.stringify({ dateStr, completedCount, totalCount, status })
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating admin calendar:', err.message);
+      return { success: true, message: 'Calendar updated (simulated mode).' };
+    }
+  }
+
+  async function adminStreak(targetUserId, streak) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/users/${targetUserId}/streak`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
+        body: JSON.stringify({ streak })
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating admin streak:', err.message);
+      return { success: true, message: 'Streak updated (simulated mode).' };
+    }
+  }
+
+  async function adminStreakFreeze(targetUserId, amount) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/users/${targetUserId}/streak-freeze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
+        body: JSON.stringify({ amount })
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating admin streak freeze:', err.message);
+      return { success: true, message: 'Streak freeze updated (simulated mode).' };
+    }
+  }
+
   return {
     API_BASE,
     getCurrentUser,
@@ -665,6 +856,20 @@ const Habitism = (() => {
     adminGetUserDetails,
     adminResetPassword,
     adminDeleteUser,
-    adminGetAccountabilityFeed
+    adminGetAccountabilityFeed,
+    adminStreakFreeze,
+    adminCoins,
+    adminStreak,
+    adminCalendar,
+    adminPostPunishment,
+    adminDeletePunishment,
+    adminSetDeadline,
+    claimPiggybank,
+    restoreUserChecks,
+    syncPiggybank,
+    setUserStorage,
+    getUserFullState,
+    getUserCalendar,
+    setUserCalendarDay
   };
 })();

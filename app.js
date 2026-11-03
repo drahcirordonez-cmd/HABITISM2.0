@@ -489,6 +489,46 @@ const Habitism = (() => {
   }
 
   // ==========================================================================
+  
+  // --------------------------------------------------------------------------
+  // Calendar & Full State Cloud Persistence
+  // --------------------------------------------------------------------------
+  async function getUserFullState(userId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/user/full-state/${userId}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.warn('Could not fetch full state from server:', e.message);
+      return null;
+    }
+  }
+
+  async function getUserCalendar(userId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/user/calendar/${userId}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.warn('Could not fetch calendar from server:', e.message);
+      return null;
+    }
+  }
+
+  async function setUserCalendarDay(userId, dateStr, count) {
+    try {
+      const res = await fetch(`${API_BASE}/api/user/calendar/set-day`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, dateStr, count })
+      });
+      return await res.json();
+    } catch (e) {
+      console.warn('Could not save calendar day to server:', e.message);
+      return null;
+    }
+  }
+
   // 6. Admin API Helpers
   // ==========================================================================
   async function adminGetUsers() {
@@ -827,6 +867,9 @@ const Habitism = (() => {
     claimPiggybank,
     restoreUserChecks,
     syncPiggybank,
-    setUserStorage
+    setUserStorage,
+    getUserFullState,
+    getUserCalendar,
+    setUserCalendarDay
   };
 })();

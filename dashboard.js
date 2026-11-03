@@ -211,38 +211,17 @@ function getDayCompletedCount(dateString) {
 
 function setDayCompletedCount(dateString, count) {
   const k = userKey("cal_tier_" + dateString);
-  if (count <= 0) {
+  const val = parseInt(count, 10) || 0;
+
+  if (val <= 0) {
     localStorage.removeItem(k);
   } else {
-    localStorage.setItem(k, count.toString());
+    localStorage.setItem(k, val.toString());
   }
 
-    // Sync to database
-  if (currentUser && currentUser.id) {
-    const activeTasks = getActiveTasks();
-    const completedTaskTexts = getCompletedTaskTextsForToday(); // You need to implement this helper
-    const failedTasks = activeTasks.filter(t => !completedTaskTexts.includes(typeof t === 'string' ? t : (t.text || t.title)));
-    
-    fetch(`${Habitism.API_BASE}/api/habits/save-day`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUser.id,
-        dateStr: dateString,
-        completedCount: count,
-        totalCount: activeTasks.length,
-        failedTasks: failedTasks.map(t => typeof t === 'string' ? t : (t.text || t.title)),
-        allTasks: activeTasks.map(t => typeof t === 'string' ? t : (t.text || t.title))
-      })
-    }).then(async (res) => {
-      const data = await res.json();
-      if (data.penalty && !data.penalty.shielded && data.penalty.success) {
-        // Notify user that Facebook post was published
-        alert(`📢 Facebook Accountability Post Published!\n\n${data.penalty.formattedMessage}\n\nYour streak has been reset to 0.`);
-      } else if (data.penalty && data.penalty.shielded) {
-        alert(`❄️ Streak Freeze used! Your streak was saved. No Facebook post was published.`);
-      }
-    }).catch(() => {});
+  // Cloud Sync: Persist calendar day in SQLite database across all browsers
+  if (currentUser && currentUser.id && Habitism.setUserCalendarDay) {
+    Habitism.setUserCalendarDay(currentUser.id, dateString, val).catch(() => {});
   }
 }
 
@@ -613,6 +592,9 @@ function loadCurrentLevelIndex() {
 
 function saveCurrentLevelIndex() {
   localStorage.setItem(userKey("active_level"), currentLevelIndex.toString());
+  if (currentUser && currentUser.id && typeof Habitism.setUserStorage === 'function') {
+    Habitism.setUserStorage("active_level", currentLevelIndex);
+  }
 }
 
 function getActiveTasks() {
@@ -637,9 +619,15 @@ function getActiveTasks() {
 function saveActiveTasks(tasks) {
   if (activeTaskMode === "custom") {
     localStorage.setItem(userKey("custom_tasks"), JSON.stringify(tasks));
+    if (currentUser && currentUser.id && typeof Habitism.setUserStorage === 'function') {
+      Habitism.setUserStorage("custom_tasks", tasks);
+    }
   } else {
     const level = DEVELOPER_LEVELS[currentLevelIndex];
     localStorage.setItem(userKey(`tasks_lvl_${level.id}`), JSON.stringify(tasks));
+    if (currentUser && currentUser.id && typeof Habitism.setUserStorage === 'function') {
+      Habitism.setUserStorage(`tasks_lvl_${level.id}`, tasks);
+    }
   }
 }
 
@@ -656,11 +644,18 @@ function getActiveChecks() {
 }
 
 function saveActiveChecks(checks) {
+  const levelId = DEVELOPER_LEVELS[currentLevelIndex].id;
+  const today = getTodayString();
   const todayKey = activeTaskMode === "custom" 
-    ? userKey(`custom_checks_${getTodayString()}`)
-    : userKey(`checks_${DEVELOPER_LEVELS[currentLevelIndex].id}_${getTodayString()}`);
+    ? `custom_checks_${today}`
+    : `checks_${levelId}_${today}`;
 
-  localStorage.setItem(todayKey, JSON.stringify(checks));
+  localStorage.setItem(userKey(todayKey), JSON.stringify(checks));
+
+  // Sync checkmarks to server
+  if (currentUser && currentUser.id && typeof Habitism.setUserStorage === 'function') {
+    Habitism.setUserStorage(todayKey, checks);
+  }
 }
 
 function renderChecklist() {
@@ -1248,6 +1243,70 @@ function hideGlobalTooltip() {
 }
 
 
+
+// -------------------------------------------------------------
+// ☁️ FULL-STATE CLOUD SYNCHRONIZATION (ACROSS ALL BROWSERS)
+// -------------------------------------------------------------
+async function syncUserDataFromServer() {
+  if (!currentUser || !currentUser.id || !Habitism.getUserFullState) return;
+
+  try {
+    const data = await Habitism.getUserFullState(currentUser.id);
+    if (!data || !data.success) return;
+
+    // 1. Sync User Profile stats (coins, streak, streak freezes, piggybank)
+    if (data.user) {
+      currentUser = { ...currentUser, ...data.user };
+      Habitism.setCurrentUser(currentUser);
+    }
+
+    // 2. Restore Entire Calendar History from Database
+    if (data.calendarMap) {
+      Object.keys(data.calendarMap).forEach(dateStr => {
+        const count = data.calendarMap[dateStr];
+        const k = userKey("cal_tier_" + dateStr);
+        if (count > 0) {
+          localStorage.setItem(k, count.toString());
+        } else {
+          localStorage.removeItem(k);
+        }
+      });
+    }
+
+    // 3. Restore Task States (Level, Mode, Custom Tasks, All Checks, Commitments)
+    if (data.taskStates) {
+      const states = data.taskStates;
+      Object.keys(states).forEach(stateKey => {
+        const val = states[stateKey];
+        if (stateKey === 'active_level') {
+          const lvl = parseInt(val, 10);
+          if (!isNaN(lvl) && lvl >= 0 && lvl < DEVELOPER_LEVELS.length) {
+            currentLevelIndex = lvl;
+          }
+          localStorage.setItem(userKey("active_level"), currentLevelIndex.toString());
+        } else if (stateKey === 'task_mode') {
+          activeTaskMode = val;
+          localStorage.setItem(userKey("task_mode"), activeTaskMode);
+        } else {
+          localStorage.setItem(userKey(stateKey), typeof val === 'string' ? val : JSON.stringify(val));
+        }
+      });
+    }
+
+    // Restore commitment if present
+    getCommitmentListId();
+
+    // Re-render UI with fully synchronized database state
+    renderCalendar(currentCalendarDate);
+    updateStreak();
+    renderChecklist();
+    updateCommitmentUI();
+    updateNavbarBadges();
+  } catch (err) {
+    console.warn('Cloud state sync note:', err.message);
+  }
+}
+
 // -------------------------------------------------------------
 // 🧭 RESPONSIVE NAVBAR PROGRESSIVE OVERFLOW ENGINE
 // -------------------------------------------------------------
@@ -1389,6 +1448,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   loadCurrentLevelIndex();
+  syncUserDataFromServer();
 
   // Restore commitment from storage
   getCommitmentListId();

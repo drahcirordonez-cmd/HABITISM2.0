@@ -168,6 +168,10 @@ function renderUsersTable(users) {
                 🗑️
               </button>
             ` : ''}
+          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustFreeze(${u.id})">❄️ Freeze</button>
+          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustCoins(${u.id})">🪙 Coins</button>
+          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustStreak(${u.id})">🔥 Streak</button>
+          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustCalendar(${u.id})">📅 Calendar</button>
           </div>
         </td>
       </tr>
@@ -373,6 +377,98 @@ async function deleteUser(userId, username) {
 }
 
 // ==========================================================================
+// Quick Adjust: Streak Freeze
+// ==========================================================================
+async function quickAdjustFreeze(userId) {
+  const amount = prompt(`Adjust streak freezes for user #${userId}.\nEnter positive number to ADD, negative to REMOVE (e.g. 1 or -1):`, '0');
+  if (amount === null) return;
+  const amt = parseInt(amount);
+  if (isNaN(amt)) { alert('Invalid number.'); return; }
+
+  try {
+    const res = await Habitism.adminStreakFreeze(userId, amt);
+    if (res.success) {
+      alert(res.message);
+      loadAdminData();
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ==========================================================================
+// Quick Adjust: Coins
+// ==========================================================================
+async function quickAdjustCoins(userId) {
+  const amount = prompt(`Adjust coins for user #${userId}.\nEnter positive number to ADD, negative to REMOVE (e.g. 50 or -20):`, '0');
+  if (amount === null) return;
+  const amt = parseInt(amount);
+  if (isNaN(amt)) { alert('Invalid number.'); return; }
+
+  try {
+    const res = await Habitism.adminCoins(userId, amt);
+    if (res.success) {
+      alert(res.message);
+      loadAdminData();
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ==========================================================================
+// Quick Adjust: Streak
+// ==========================================================================
+async function quickAdjustStreak(userId) {
+  const streak = prompt(`Set streak for user #${userId} (days):`, '0');
+  if (streak === null) return;
+  const val = parseInt(streak);
+  if (isNaN(val)) { alert('Invalid number.'); return; }
+
+  try {
+    const res = await Habitism.adminStreak(userId, val);
+    if (res.success) {
+      alert(res.message);
+      loadAdminData();
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ==========================================================================
+// Quick Adjust: Calendar
+// ==========================================================================
+async function quickAdjustCalendar(userId) {
+  const dateStr = prompt(`Enter date (YYYY-MM-DD) for user #${userId}:`, new Date().toISOString().split('T')[0]);
+  if (dateStr === null) return;
+  const completedCount = prompt('Completed tasks count:', '0');
+  if (completedCount === null) return;
+  const totalCount = prompt('Total tasks count:', '5');
+  if (totalCount === null) return;
+  const status = prompt('Status (in_progress/completed):', 'in_progress');
+  if (status === null) return;
+
+  try {
+    const res = await Habitism.adminCalendar(userId, dateStr, parseInt(completedCount), parseInt(totalCount), status);
+    if (res.success) {
+      alert(res.message);
+      loadAdminData();
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ==========================================================================
 // Facebook Graph API Accountability Feed
 // ==========================================================================
 async function loadAccountabilityFeed() {
@@ -397,7 +493,7 @@ function renderAccountabilityFeed(posts) {
   if (posts.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">
+        <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
           No accountability posts triggered yet. Users are staying consistent! 🌸
         </td>
       </tr>
@@ -419,8 +515,66 @@ function renderAccountabilityFeed(posts) {
       <td style="font-size: 0.84rem; color: #cbd5e1; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
         &ldquo;${escapeHtml(p.message || '')}&rdquo;
       </td>
+      <td style="text-align: center;">
+        <button type="button" class="admin-btn admin-btn-danger" style="padding: 3px 8px; font-size: 0.7rem;" onclick="deleteFacebookPunishment(${p.id})">
+          🗑️
+        </button>
+      </td>
     </tr>
   `).join('');
+}
+
+async function postFacebookPunishment() {
+  const userId = prompt('Enter User ID to post Facebook punishment for:');
+  if (!userId) return;
+  const dateStr = prompt('Enter date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+  if (!dateStr) return;
+  const message = prompt('Enter punishment message:', 'This person made this commitment on Habitism but did not complete it.');
+  if (message === null) return;
+
+  try {
+    const res = await Habitism.adminPostPunishment(userId, dateStr, [], [], message);
+    if (res.success) {
+      alert(res.message);
+      loadAccountabilityFeed();
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function deleteFacebookPunishment(postId) {
+  if (!confirm('Delete this accountability post?')) return;
+  try {
+    const res = await Habitism.adminDeletePunishment(postId);
+    if (res.success) {
+      alert(res.message);
+      loadAccountabilityFeed();
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function setUserDeadline() {
+  const userId = prompt('Enter User ID to set deadline for (leave blank for global default):');
+  const deadlineTime = prompt('Enter deadline time (HH:MM, e.g. 23:59):', '23:59');
+  if (!deadlineTime) return;
+
+  try {
+    const res = await Habitism.adminSetDeadline(userId || null, deadlineTime);
+    if (res.success) {
+      alert(res.message);
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
 }
 
 async function triggerTestFacebookPost() {
@@ -452,4 +606,3 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
-
