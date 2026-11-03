@@ -149,7 +149,7 @@ const FB_CONFIG = {
   appId: process.env.FB_APP_ID || '992807423129946',
   pageName: process.env.FB_PAGE_NAME || 'Habitism',
   pageId: process.env.FB_PAGE_ID || '1496888330165860',
-  accessToken: process.env.FB_ACCESS_TOKEN || 'EAAOG8ZC3JOVoBS9yG3FKR0cv6iMKwqSIWUOPnsTlude3Lp2KFEgc7FNhQ0MCtPMZBPoFcwLbiABUKWnAgTRefCfSK3O0wY6Wt8FruTY88lqX9WgZCzgomgCpgVRuZCCSjCE7i6jWi5khesr8gBzoUxSQy92jZAOd1SQgLn2IjMRLcUZB23ZAATTgNnDD9qENNuGEdi6ZBSQT'
+  accessToken: process.env.FB_ACCESS_TOKEN || 'EAAOG8ZC3JOVoBSxfUFmsZA8RKqwjO1B4Kzz6yxKbgysxZBXiTTJgBqGkm7NiGcYvUC3egVtQc8sXHzoKJjUsjuvwvnVepLugyKvhfpxMSa0jWIw2zPhKkP3RaZA8E2SKdvEZCC7ZBZA0LBwbbv621ngHtZCAq4S0ErCm5Jm6ZALwxeUjO3ZA6cjDpPcC5ZAgIGfyvOtFM5B'
 };
 
 /**
