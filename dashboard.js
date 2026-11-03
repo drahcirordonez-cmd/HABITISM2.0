@@ -447,13 +447,13 @@ function updateCommitmentUI() {
 
   if (hasCommitment) {
     const label = effectiveListId === 'custom' ? 'Custom List' : `Level ${effectiveListId.replace('lvl_', '')}`;
-    commitmentLabel.innerText = `Committed: ${label}`;
-    commitmentLabel.style.display = "block";
+    commitmentLabel.innerText = `📌 Committed: ${label}`;
+    commitmentLabel.style.display = "inline-flex";
     commitBtn.style.display = "none";
-    removeBtn.style.display = "inline-block";
+    removeBtn.style.display = "inline-flex";
   } else {
     commitmentLabel.style.display = "none";
-    commitBtn.style.display = "inline-block";
+    commitBtn.style.display = "inline-flex";
     removeBtn.style.display = "none";
   }
 }

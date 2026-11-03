@@ -193,36 +193,38 @@
         </div>
 
         <div class="card-footer checklist-footer">
-          <form id="addHabitForm" onsubmit="addTask(event)">
-            <input type="text" id="newHabitInput" placeholder="Add custom habit to this list..." autocomplete="off">
-            <button type="submit" class="add-btn" title="Add Task">+</button>
-          </form>
+          <div class="footer-layout-grid">
+            <!-- Left Column: Commit Button (Top) + Task Input (Bottom) -->
+            <div class="footer-left-col">
+              <!-- Top Row: Commit Button & Info Tooltip -->
+              <div class="commitment-controls-row">
+                <div id="commitmentLabel" class="commitment-badge" style="display: none;"></div>
+                <button type="button" class="btn-commit" id="btnCommit" onclick="commitToCurrentList()">
+                  <span>📌 Commit to this?</span>
+                </button>
+                <button type="button" class="btn-remove-commit" id="btnRemoveCommitment" onclick="removeCommitment()" style="display: none;">
+                  <span>❌ Remove Commitment</span>
+                </button>
+                <button type="button" class="info-btn commit-info-btn" data-info="Committing locks your calendar glow to this list. You can still check other levels without losing it." aria-label="Commitment Info" tabindex="0">i</button>
+              </div>
 
-          <!-- Commitment Controls -->
-          <div class="commitment-controls" style="margin-top: 12px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-            <div id="commitmentLabel" style="font-size: 0.82rem; font-weight: 700; color: #fde68a; margin-bottom: 8px; display: none;"></div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button class="nav-btn-link btn-primary" id="btnCommit" onclick="commitToCurrentList()" style="flex: 1; min-width: 110px; padding: 8px; font-size: 0.85rem;">
-                <span>📌 Commit to This List</span>
-              </button>
-              <button class="nav-btn-link btn-secondary" id="btnRemoveCommitment" onclick="removeCommitment()" style="flex: 1; min-width: 110px; padding: 8px; font-size: 0.85rem; display: none;">
-                <span>❌ Remove Commitment</span>
-              </button>
+              <!-- Bottom Row: Input Task Form -->
+              <form id="addHabitForm" onsubmit="addTask(event)" class="add-habit-form">
+                <input type="text" id="newHabitInput" placeholder="Add custom habit to this list..." autocomplete="off">
+                <button type="submit" class="add-btn" title="Add Task">+</button>
+              </form>
             </div>
-            <div style="margin-top: 6px; font-size: 0.72rem; color: #94a3b8;">
-              Committing locks your calendar glow to this list. You can still check other levels without losing it.
-            </div>
-          </div>
 
-          <!-- Piggybank Display -->
-          <div class="piggybank-display" style="margin-top: 12px; padding: 10px; background: rgba(255, 215, 0, 0.08); border-radius: 8px; border: 1px solid rgba(255, 215, 0, 0.2);">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-              <span style="font-size: 1.2rem;">🐷</span>
-              <span style="font-size: 0.85rem; font-weight: 700; color: #fbbf24;">Piggybank: 🪙 <span id="piggybankBalance">0</span></span>
+            <!-- Right Column: Piggybank -->
+            <div class="piggybank-card">
+              <div class="piggybank-header">
+                <span class="piggybank-icon">🐷</span>
+                <span class="piggybank-label">Piggybank: 🪙 <span id="piggybankBalance">0</span></span>
+              </div>
+              <button type="button" class="btn-claim-piggybank" id="btnClaimPiggybank" onclick="claimPiggybank()">
+                <span>Claim to Main Balance</span>
+              </button>
             </div>
-            <button class="nav-btn-link btn-secondary" id="btnClaimPiggybank" onclick="claimPiggybank()" style="padding: 6px 12px; font-size: 0.8rem; margin-top: 4px;">
-              <span>Claim to Main Balance</span>
-            </button>
           </div>
         </div>
       </div>
