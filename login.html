@@ -926,12 +926,15 @@
       }
     }
 
-    // Auto-trigger if redirected from Introduction page with ?action=fb
+    // Auto-highlight if redirected from Introduction page with ?action=fb
     window.addEventListener("DOMContentLoaded", () => {
       Habitism.initFacebookSDK();
       const params = new URLSearchParams(window.location.search);
       if (params.get('action') === 'fb') {
-        setTimeout(handleFacebookLogin, 600);
+        const fbBtn = document.querySelector('.btn-facebook');
+        if (fbBtn) {
+          fbBtn.focus();
+        }
       }
     });
   </script>
