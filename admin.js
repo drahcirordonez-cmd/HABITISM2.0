@@ -501,27 +501,45 @@ function renderAccountabilityFeed(posts) {
     return;
   }
 
-  tbody.innerHTML = posts.map(p => `
-    <tr>
-      <td style="color: #64748b; font-size: 0.8rem; white-space: nowrap;">${p.created_at || 'Just now'}</td>
-      <td style="font-weight: 700; color: #ffffff;">${escapeHtml(p.user_name || 'User #' + p.user_id)}</td>
-      <td style="color: #38bdf8; font-size: 0.82rem;">Page: ${escapeHtml(p.fb_page_id || '1496888330165860')}</td>
-      <td>
-        <span style="font-size: 0.82rem; padding: 3px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #bae6fd;">
-          ${escapeHtml(p.status || 'published')}
-        </span>
-      </td>
-      <td style="font-family: monospace; font-size: 0.8rem; color: #94a3b8;">${escapeHtml(p.fb_post_id || 'sim_fb_post')}</td>
-      <td style="font-size: 0.84rem; color: #cbd5e1; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-        &ldquo;${escapeHtml(p.message || '')}&rdquo;
-      </td>
-      <td style="text-align: center;">
-        <button type="button" class="admin-btn admin-btn-danger" style="padding: 3px 8px; font-size: 0.7rem;" onclick="deleteFacebookPunishment(${p.id})">
-          🗑️
-        </button>
-      </td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = posts.map(p => {
+    const isSuccess = p.status === 'published';
+    const statusStyle = isSuccess
+      ? 'background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.4); color: #34d399;'
+      : 'background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;';
+    
+    // Parse response payload if error
+    let errorDetail = '';
+    if (!isSuccess && p.response_payload) {
+      try {
+        const payload = JSON.parse(p.response_payload);
+        if (payload.error && payload.error.message) {
+          errorDetail = `\n⚠️ Reason: ${payload.error.message}`;
+        }
+      } catch (e) {}
+    }
+
+    return `
+      <tr>
+        <td style="color: #64748b; font-size: 0.8rem; white-space: nowrap;">${p.created_at || 'Just now'}</td>
+        <td style="font-weight: 700; color: #ffffff;">${escapeHtml(p.user_name || 'User #' + p.user_id)}</td>
+        <td style="color: #38bdf8; font-size: 0.82rem;">Page: ${escapeHtml(p.fb_page_id || '1496888330165860')}</td>
+        <td>
+          <span style="font-size: 0.82rem; padding: 3px 8px; border-radius: 6px; font-weight: 600; ${statusStyle}" title="${escapeHtml(p.status + errorDetail)}">
+            ${escapeHtml(p.status || 'published')}
+          </span>
+        </td>
+        <td style="font-family: monospace; font-size: 0.8rem; color: #94a3b8;">${escapeHtml(p.fb_post_id || 'sim_fb_post')}</td>
+        <td style="font-size: 0.84rem; color: #cbd5e1; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          &ldquo;${escapeHtml(p.message || '')}&rdquo;
+        </td>
+        <td style="text-align: center;">
+          <button type="button" class="admin-btn admin-btn-danger" style="padding: 3px 8px; font-size: 0.7rem;" onclick="deleteFacebookPunishment(${p.id})">
+            🗑️
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 async function postFacebookPunishment() {

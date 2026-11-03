@@ -962,12 +962,17 @@ app.post('/api/admin/accountability/post', async (req, res) => {
     message || 'This person made this commitment on Habitism but did not complete it.'
   );
 
+  const isFbSuccess = fbResult && fbResult.success;
+  const fbErrorNotice = fbResult && (fbResult.error || (fbResult.data && fbResult.data.error ? fbResult.data.error.message : null));
+
   return res.json({
     success: true,
     shielded: false,
     streakReset: true,
     facebookResult: fbResult,
-    message: `Facebook accountability posted for ${user.name}. Streak reset to 0.`
+    message: isFbSuccess
+      ? `📢 Facebook accountability posted for ${user.name}! (Post ID: ${fbResult.postId})`
+      : `⚠️ Note: Streak reset to 0 for ${user.name}, but Facebook returned: ${fbErrorNotice || 'API fallback'}`
   });
 });
 
