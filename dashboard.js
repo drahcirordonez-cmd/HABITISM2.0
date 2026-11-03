@@ -263,9 +263,16 @@ function saveCommitmentStorage(data) {
   } else {
     localStorage.setItem(getCommitmentKey(), JSON.stringify(data));
   }
-  // Sync to server (defensive: setUserStorage may not be exposed yet)
-  if (currentUser && currentUser.id && typeof Habitism.setUserStorage === 'function') {
-    Habitism.setUserStorage(`commitment_${getTodayString()}`, data).catch(() => {});
+  // Sync to server defensively (never block or throw)
+  try {
+    if (currentUser && currentUser.id && typeof Habitism.setUserStorage === 'function') {
+      const syncPromise = Habitism.setUserStorage(`commitment_${getTodayString()}`, data);
+      if (syncPromise && typeof syncPromise.catch === 'function') {
+        syncPromise.catch(() => {});
+      }
+    }
+  } catch (syncErr) {
+    console.warn('Commitment cloud sync note:', syncErr.message);
   }
 }
 
@@ -355,6 +362,11 @@ function commitToCurrentList() {
 
   commitToList(listId, levelIndex);
 }
+
+// Global exposure for inline onclick handlers
+window.commitToCurrentList = commitToCurrentList;
+window.removeCommitment = removeCommitment;
+window.updateCommitmentUI = updateCommitmentUI;
 
 async function claimPiggybank() {
   const user = Habitism.getCurrentUser();

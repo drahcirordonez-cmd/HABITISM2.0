@@ -85,12 +85,15 @@ const Habitism = (() => {
     // Background sync to server if user is logged in
     const user = getCurrentUser();
     if (user && user.id) {
-      fetch(`${API_BASE}/api/user/state/save`, {
+      return fetch(`${API_BASE}/api/user/state/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, stateKey: key, stateValue: value })
-      }).catch(() => {});
+      }).catch((err) => {
+        console.warn('setUserStorage sync failed:', err);
+      });
     }
+    return Promise.resolve();
   }
 
   function requireAuth(redirectCommitment = true, adminOnly = false) {
