@@ -1109,11 +1109,20 @@ app.post('/api/facebook/post', async (req, res) => {
 // ============================================================================
 async function runDailyDeadlineEvaluator() {
   try {
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const tz = process.env.TIMEZONE || process.env.TZ || 'Asia/Manila';
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(new Date());
+    const hours = parts.find(p => p.type === 'hour').value;
+    const minutes = parts.find(p => p.type === 'minute').value;
     const currentTimeStr = `${hours}:${minutes}`;
-    const todayStr = now.toDateString();
+
+    const localDate = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+    const todayStr = localDate.toDateString();
 
     const users = db.prepare(`
       SELECT id, name, username, email, streak, streak_freezes, deadline_time, facebook_name 
