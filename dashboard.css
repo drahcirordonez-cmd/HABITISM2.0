@@ -775,14 +775,31 @@ body {
 }
 
 .commit-info-btn {
-  width: 22px !important;
-  height: 22px !important;
-  min-width: 22px !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
   border-radius: 50% !important;
   font-size: 13px !important;
   font-weight: 800 !important;
   font-family: ui-serif, Georgia, serif !important;
-  margin-left: 2px !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  color: #ffffff !important;
+  margin-left: 4px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+}
+
+.commit-info-btn:hover,
+.commit-info-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-color: #ffffff !important;
+  transform: scale(1.15) !important;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.5) !important;
+  outline: none;
 }
 
 /* Row 2: Add Habit Input Form in Left Column */
