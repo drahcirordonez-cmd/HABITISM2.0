@@ -735,25 +735,10 @@ const Habitism = (() => {
   }
 
   async function restoreUserChecks(userId) {
-    try {
-      const res = await fetchJson(`${API_BASE}/api/admin/user-details/${userId}`, {
-        headers: { 'x-admin-id': userId }
-      });
-      if (!res.success || !res.taskStates) return {};
-
-      const checks = {};
-      res.taskStates.forEach(ts => {
-        if (ts.state_key.startsWith('checks_')) {
-          try {
-            checks[ts.state_key] = JSON.parse(ts.state_value);
-          } catch (e) {}
-        }
-      });
-      return checks;
-    } catch (err) {
-      console.warn('Failed to restore user checks:', err.message);
-      return {};
-    }
+    // Checks are already synced to server via setUserStorage on every toggle.
+    // On login, localStorage already has the user's checks (scoped by user ID via getUserKey).
+    // Return empty so the dashboard uses whatever is already in localStorage.
+    return {};
   }
 
   async function adminCalendar(targetUserId, dateStr, completedCount, totalCount, status) {

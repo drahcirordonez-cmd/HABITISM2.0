@@ -253,9 +253,10 @@ function getCompletedTaskTextsForToday() {
   const checks = getActiveChecks();
   const tasks = getActiveTasks();
   const completedTexts = [];
-  checks.forEach((completed, index) => {
-    if (completed) {
-      const task = tasks[index];
+  // checks is an object like {0: true, 1: false}, not an array
+  Object.keys(checks).forEach(index => {
+    if (checks[index]) {
+      const task = tasks[parseInt(index)];
       completedTexts.push(typeof task === 'string' ? task : (task.text || task.title));
     }
   });
@@ -1113,6 +1114,7 @@ function initGlobalTooltip() {
 
   // Mouse Enter on any .info-btn
   document.addEventListener("mouseenter", (e) => {
+    if (!e.target || !e.target.closest) return;
     const btn = e.target.closest(".info-btn");
     if (btn && btn.dataset.info) {
       showGlobalTooltip(btn, btn.dataset.info);
@@ -1121,6 +1123,7 @@ function initGlobalTooltip() {
 
   // Mouse Leave on any .info-btn
   document.addEventListener("mouseleave", (e) => {
+    if (!e.target || !e.target.closest) return;
     const btn = e.target.closest(".info-btn");
     if (btn) {
       hideGlobalTooltip();
@@ -1129,6 +1132,7 @@ function initGlobalTooltip() {
 
   // Focus & Blur for keyboard accessibility
   document.addEventListener("focusin", (e) => {
+    if (!e.target || !e.target.closest) return;
     const btn = e.target.closest(".info-btn");
     if (btn && btn.dataset.info) {
       showGlobalTooltip(btn, btn.dataset.info);
@@ -1136,6 +1140,7 @@ function initGlobalTooltip() {
   }, true);
 
   document.addEventListener("focusout", (e) => {
+    if (!e.target || !e.target.closest) return;
     const btn = e.target.closest(".info-btn");
     if (btn) {
       hideGlobalTooltip();
@@ -1147,6 +1152,7 @@ function initGlobalTooltip() {
   // (e.g. the habit toggle) so tapping an (i) button shows its tooltip on
   // cellphones (where there is no hover) without triggering the parent action.
   document.addEventListener("click", (e) => {
+    if (!e.target || !e.target.closest) return;
     const btn = e.target.closest(".info-btn");
     if (btn && btn.dataset.info) {
       e.stopPropagation();
