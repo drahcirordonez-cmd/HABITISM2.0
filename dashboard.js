@@ -284,8 +284,8 @@ function saveCommitmentStorage(data) {
   } else {
     localStorage.setItem(getCommitmentKey(), JSON.stringify(data));
   }
-  // Sync to server
-  if (currentUser && currentUser.id) {
+  // Sync to server (defensive: setUserStorage may not be exposed yet)
+  if (currentUser && currentUser.id && typeof Habitism.setUserStorage === 'function') {
     Habitism.setUserStorage(`commitment_${getTodayString()}`, data).catch(() => {});
   }
 }
@@ -332,8 +332,20 @@ function commitToList(listId, levelIndex) {
 
 function removeCommitment() {
   if (!committedListId) {
-    showToast("ℹ️ No active commitment to remove.");
-    return;
+    // Try to recover from localStorage in case JS variable is out of sync
+    const stored = localStorage.getItem(getCommitmentKey());
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        committedListId = parsed.listId;
+        committedDate = parsed.date;
+        committedLevelIndex = parsed.levelIndex;
+      } catch (e) {}
+    }
+    if (!committedListId) {
+      showToast("ℹ️ No active commitment to remove.");
+      return;
+    }
   }
 
   const removedLabel = committedListId === 'custom' ? 'Custom List' : `Level ${committedListId.replace('lvl_', '')}`;
