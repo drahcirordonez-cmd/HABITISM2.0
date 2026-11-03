@@ -82,6 +82,8 @@ db.exec(`
     date_str TEXT NOT NULL,
     message TEXT NOT NULL,
     status TEXT NOT NULL,
+    fb_page_id TEXT,
+    fb_post_id TEXT,
     post_id TEXT,
     response_payload TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -103,6 +105,8 @@ try { db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';`); } catch
 try { db.exec(`ALTER TABLE users ADD COLUMN facebook_name TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN piggybank_coins INTEGER DEFAULT 0;`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN deadline_time TEXT DEFAULT '23:59';`); } catch (e) {}
+try { db.exec(`ALTER TABLE accountability_posts ADD COLUMN fb_page_id TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE accountability_posts ADD COLUMN fb_post_id TEXT;`); } catch (e) {}
 
 console.log('✅ SQLite Database initialized at habitism.db');
 
@@ -200,22 +204,26 @@ Discipline Penalty: Daily streak has been broken and reset to 0 days.
     const data = await response.json();
     const isSuccess = response.ok && data.id;
 
-    const stmt = db.prepare(`
-      INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, fb_post_id, post_id, response_payload)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, fb_post_id, post_id, response_payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    stmt.run(
-      userId,
-      userName,
-      dateStr,
-      message,
-      isSuccess ? 'published' : 'api_error_fallback',
-      FB_CONFIG.pageId,
-      data.id || 'simulated_post_' + Date.now(),
-      data.id || null,
-      JSON.stringify(data)
-    );
+      stmt.run(
+        userId,
+        userName,
+        dateStr,
+        message,
+        isSuccess ? 'published' : 'api_error_fallback',
+        FB_CONFIG.pageId,
+        data.id || 'simulated_post_' + Date.now(),
+        data.id || null,
+        JSON.stringify(data)
+      );
+    } catch (dbErr) {
+      console.warn('Could not record accountability post in SQLite:', dbErr.message);
+    }
 
     return {
       success: isSuccess,
@@ -1051,22 +1059,26 @@ app.post('/api/facebook/post', async (req, res) => {
     const data = await response.json();
     const isSuccess = response.ok && data.id;
 
-    const stmt = db.prepare(`
-      INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, fb_post_id, post_id, response_payload)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, fb_post_id, post_id, response_payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    stmt.run(
-      1,
-      'Admin Test',
-      new Date().toDateString(),
-      message,
-      isSuccess ? 'published' : 'api_error_fallback',
-      FB_CONFIG.pageId,
-      data.id || 'test_' + Date.now(),
-      data.id || null,
-      JSON.stringify(data)
-    );
+      stmt.run(
+        1,
+        'Admin Test',
+        new Date().toDateString(),
+        message,
+        isSuccess ? 'published' : 'api_error_fallback',
+        FB_CONFIG.pageId,
+        data.id || 'test_' + Date.now(),
+        data.id || null,
+        JSON.stringify(data)
+      );
+    } catch (dbErr) {
+      console.warn('Logging to accountability_posts failed:', dbErr.message);
+    }
 
     if (!response.ok) {
       return res.status(response.status).json({
