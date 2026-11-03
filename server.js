@@ -143,14 +143,96 @@ function seedDefaultAccounts() {
 seedDefaultAccounts();
 
 // ============================================================================
-// 2. FACEBOOK GRAPH API CONFIGURATION
+// 2. FACEBOOK GRAPH API CONFIGURATION & RESILIENT CLIENT
 // ============================================================================
+const DEFAULT_FB_PAGE_TOKEN = 'EAAOG8ZC3JOVoBS3YSZCe8uhA5vBCoaDjsQqNQawzmP6F0UfbI5xmCs0EfYS3zglFmwbZAeoPH0BespA2FP53cnUV05utfftgqGUnuu9dxknWa3b11SpQW8IX05YFUUbrAbNjCiYnPjsxkPjV2VBjgeZCN98QAWQTj7LoyS3ICfqysFym0La0EqZAgE4LpO44KFBcxnV4X';
+
+function getSanitizedFbToken() {
+  const envToken = (process.env.FB_ACCESS_TOKEN || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/[\r\n\s]/g, '');
+
+  // If env variable is valid and complete (Meta tokens are ~200+ chars starting with EAA)
+  if (envToken && envToken.startsWith('EAA') && envToken.length >= 195) {
+    return envToken;
+  }
+  return DEFAULT_FB_PAGE_TOKEN;
+}
+
 const FB_CONFIG = {
   appId: process.env.FB_APP_ID || '992807423129946',
   pageName: process.env.FB_PAGE_NAME || 'Habitism',
   pageId: process.env.FB_PAGE_ID || '1496888330165860',
-  accessToken: process.env.FB_ACCESS_TOKEN || 'EAAOG8ZC3JOVoBSxfUFmsZA8RKqwjO1B4Kzz6yxKbgysxZBXiTTJgBqGkm7NiGcYvUC3egVtQc8sXHzoKJjUsjuvwvnVepLugyKvhfpxMSa0jWIw2zPhKkP3RaZA8E2SKdvEZCC7ZBZA0LBwbbv621ngHtZCAq4S0ErCm5Jm6ZALwxeUjO3ZA6cjDpPcC5ZAgIGfyvOtFM5B'
+  get accessToken() {
+    return getSanitizedFbToken();
+  }
 };
+
+/**
+ * Executes Facebook Page feed post with automatic fallback and retry
+ */
+async function publishToFacebookPage(message) {
+  const url = `https://graph.facebook.com/v19.0/${FB_CONFIG.pageId}/feed`;
+  let activeToken = FB_CONFIG.accessToken;
+  let response;
+  let data;
+
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: message,
+        access_token: activeToken
+      })
+    });
+    data = await response.json();
+  } catch (networkErr) {
+    return {
+      success: false,
+      error: networkErr.message,
+      data: null,
+      postId: null
+    };
+  }
+
+  // If initial token failed with decryption/auth/permission error, retry immediately with verified permanent Page Token
+  const isTokenError = !response.ok && data && data.error && (
+    data.error.code === 190 || 
+    data.error.code === 200 || 
+    (data.error.message && (
+      data.error.message.includes('token') || 
+      data.error.message.includes('permission') || 
+      data.error.message.includes('decrypted')
+    ))
+  );
+
+  if (isTokenError && activeToken !== DEFAULT_FB_PAGE_TOKEN) {
+    console.warn(`[FB Graph API] Initial token failed (${data.error.message}). Retrying automatically with verified permanent Page Token...`);
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message,
+          access_token: DEFAULT_FB_PAGE_TOKEN
+        })
+      });
+      data = await response.json();
+    } catch (retryErr) {
+      console.error('[FB Graph API] Retry request error:', retryErr.message);
+    }
+  }
+
+  const isSuccess = Boolean(response && response.ok && data && data.id);
+  return {
+    success: isSuccess,
+    postId: data ? data.id : null,
+    data: data,
+    error: isSuccess ? null : (data && data.error ? data.error.message : 'Facebook Graph API failed')
+  };
+}
 
 /**
  * Triggers Facebook Graph API post on failed commitment for a specific active user
@@ -190,19 +272,10 @@ Discipline Penalty: Daily streak has been broken and reset to 0 days.
 #Habitism #Accountability #Discipline #HabitTracker #Consistency`;
 
   try {
-    const url = `https://graph.facebook.com/v19.0/${FB_CONFIG.pageId}/feed`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: message,
-        access_token: FB_CONFIG.accessToken
-      })
-    });
-
-    const data = await response.json();
-    const isSuccess = response.ok && data.id;
+    const fbResult = await publishToFacebookPage(message);
+    const isSuccess = fbResult.success;
+    const postId = fbResult.postId;
+    const data = fbResult.data || {};
 
     try {
       const stmt = db.prepare(`
@@ -217,8 +290,8 @@ Discipline Penalty: Daily streak has been broken and reset to 0 days.
         message,
         isSuccess ? 'published' : 'api_error_fallback',
         FB_CONFIG.pageId,
-        data.id || 'simulated_post_' + Date.now(),
-        data.id || null,
+        postId || 'simulated_post_' + Date.now(),
+        postId || null,
         JSON.stringify(data)
       );
     } catch (dbErr) {
@@ -227,21 +300,26 @@ Discipline Penalty: Daily streak has been broken and reset to 0 days.
 
     return {
       success: isSuccess,
-      postId: data.id || null,
+      postId: postId,
       data: data,
+      error: fbResult.error,
       formattedMessage: message,
       message: isSuccess 
-        ? `Published accountability post to Facebook Page: ${FB_CONFIG.pageName} (Post ID: ${data.id})`
-        : `Facebook API notice: ${data.error ? data.error.message : 'Fallback logged in database'}`
+        ? `Published accountability post to Facebook Page: ${FB_CONFIG.pageName} (Post ID: ${postId})`
+        : `Facebook API notice: ${fbResult.error || 'Fallback logged in database'}`
     };
   } catch (error) {
     console.error('FB Graph API call error:', error.message);
 
-    const stmt = db.prepare(`
-      INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, response_payload)
-      VALUES (?, ?, ?, ?, 'network_error_fallback', ?, ?)
-    `);
-    stmt.run(userId, userName, dateStr, message, FB_CONFIG.pageId, error.message);
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, response_payload)
+        VALUES (?, ?, ?, ?, 'network_error_fallback', ?, ?)
+      `);
+      stmt.run(userId, userName, dateStr, message, FB_CONFIG.pageId, error.message);
+    } catch (dbErr) {
+      console.warn('Could not record network fallback in SQLite:', dbErr.message);
+    }
 
     return {
       success: false,
@@ -1051,18 +1129,10 @@ app.post('/api/facebook/post', async (req, res) => {
   }
 
   try {
-    const url = `https://graph.facebook.com/v19.0/${FB_CONFIG.pageId}/feed`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: message,
-        access_token: FB_CONFIG.accessToken
-      })
-    });
-
-    const data = await response.json();
-    const isSuccess = response.ok && data.id;
+    const fbResult = await publishToFacebookPage(message);
+    const isSuccess = fbResult.success;
+    const postId = fbResult.postId;
+    const data = fbResult.data || {};
 
     try {
       const stmt = db.prepare(`
@@ -1077,17 +1147,17 @@ app.post('/api/facebook/post', async (req, res) => {
         message,
         isSuccess ? 'published' : 'api_error_fallback',
         FB_CONFIG.pageId,
-        data.id || 'test_' + Date.now(),
-        data.id || null,
+        postId || 'test_' + Date.now(),
+        postId || null,
         JSON.stringify(data)
       );
     } catch (dbErr) {
       console.warn('Logging to accountability_posts failed:', dbErr.message);
     }
 
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: data.error ? (data.error.message || JSON.stringify(data.error)) : 'Facebook Graph API failed',
+    if (!isSuccess) {
+      return res.status(400).json({
+        error: fbResult.error || 'Facebook Graph API failed',
         status: 'error',
         postId: null,
         details: data
@@ -1097,7 +1167,7 @@ app.post('/api/facebook/post', async (req, res) => {
     return res.json({
       success: true,
       status: 'published',
-      postId: data.id,
+      postId: postId,
       note: `Published to Facebook Page ID ${FB_CONFIG.pageId}`
     });
   } catch (err) {
