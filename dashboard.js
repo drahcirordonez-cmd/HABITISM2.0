@@ -378,6 +378,12 @@ async function claimPiggybank() {
   try {
     const res = await Habitism.claimPiggybank(user.id);
     if (res.success) {
+      // Lock all currently checked boxes so they can't be unchecked/re-farmed today
+      if (res.claimed > 0) {
+        lockClaimedChecks();
+        renderChecklist();
+      }
+
       // Update local user object
       const currentUser = Habitism.getCurrentUser();
       if (currentUser) {
@@ -726,13 +732,16 @@ function renderChecklist() {
   const listEl = document.getElementById("habitList");
   listEl.innerHTML = "";
   let completedToday = 0;
+  const lockedIdx = getLockedIndices();
 
   tasks.forEach((task, index) => {
     const isCompleted = !!checks[index];
     if (isCompleted) completedToday++;
+    const isLocked = isCompleted && !!lockedIdx[index];
 
     const li = document.createElement("li");
-    li.className = `habit-item ${isCompleted ? "completed" : ""}`;
+    li.className = `habit-item ${isCompleted ? "completed" : ""} ${isLocked ? "claimed-locked" : ""}`;
+    if (isLocked) li.title = "🔒 Coins claimed — locked until tomorrow";
 
     let infoBtnHtml = "";
     if (task.info) {
@@ -753,7 +762,7 @@ function renderChecklist() {
           ${infoBtnHtml}
         </div>
       </div>
-      <button class="delete-btn" onclick="deleteTask(event, ${index})" title="Remove task">&times;</button>
+      <button class="delete-btn" onclick="deleteTask(event, ${index})" title="${isLocked ? 'Locked until tomorrow' : 'Remove task'}">${isLocked ? '🔒' : '&times;'}</button>
     `;
 
     listEl.appendChild(li);
@@ -788,9 +797,77 @@ function renderChecklist() {
   renderCalendar(currentCalendarDate);
 }
 
+// -------------------------------------------------------------
+// 🔒 CLAIM LOCK: checks counted in a piggybank claim stay checked until tomorrow
+// -------------------------------------------------------------
+function getClaimLockKey() {
+  return `claim_lock_${getTodayString()}`;
+}
+
+function getClaimLock() {
+  const saved = localStorage.getItem(userKey(getClaimLockKey()));
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (e) {}
+  }
+  return {};
+}
+
+function saveClaimLock(lock) {
+  localStorage.setItem(userKey(getClaimLockKey()), JSON.stringify(lock));
+  try {
+    if (currentUser && currentUser.id && typeof Habitism.setUserStorage === 'function') {
+      const p = Habitism.setUserStorage(getClaimLockKey(), lock);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
+  } catch (e) {}
+}
+
+function getActiveListLockId() {
+  return activeTaskMode === "custom" ? "custom" : String(DEVELOPER_LEVELS[currentLevelIndex].id);
+}
+
+function getLockedIndices() {
+  return getClaimLock()[getActiveListLockId()] || {};
+}
+
+// Snapshot every currently-checked box (all levels + custom list) as locked for today
+function lockClaimedChecks() {
+  const today = getTodayString();
+  const lock = getClaimLock();
+
+  const addFrom = (listId, storageKey) => {
+    const raw = localStorage.getItem(userKey(storageKey));
+    if (!raw) return;
+    try {
+      const checks = JSON.parse(raw);
+      Object.keys(checks).forEach(idx => {
+        if (checks[idx]) {
+          lock[listId] = lock[listId] || {};
+          lock[listId][idx] = true;
+        }
+      });
+    } catch (e) {}
+  };
+
+  DEVELOPER_LEVELS.forEach(level => addFrom(String(level.id), `checks_${level.id}_${today}`));
+  addFrom("custom", `custom_checks_${today}`);
+
+  saveClaimLock(lock);
+}
+
 function toggleTask(index) {
   const checks = getActiveChecks();
   const wasCompleted = !!checks[index];
+
+  // Claimed checks cannot be unchecked until the next day (prevents unlimited coin farming)
+  if (wasCompleted && getLockedIndices()[index]) {
+    showToast("🔒 Coins already claimed — this habit stays checked until tomorrow.");
+    return;
+  }
+
   checks[index] = !wasCompleted;
   saveActiveChecks(checks);
 
@@ -838,20 +915,33 @@ function addTask(event) {
 
 function deleteTask(event, index) {
   event.stopPropagation();
+
+  const lockedIdx = getLockedIndices();
+  if (lockedIdx[index]) {
+    showToast("🔒 This habit's coins were claimed — it can't be removed until tomorrow.");
+    return;
+  }
+
   const tasks = getActiveTasks();
   tasks.splice(index, 1);
   saveActiveTasks(tasks);
 
-  // Re-index checks
+  // Re-index checks (and claim locks so they follow their tasks)
   const checks = getActiveChecks();
   const newChecks = {};
+  const newLocked = {};
   let newIdx = 0;
   for (let i = 0; i <= tasks.length; i++) {
     if (i === index) continue;
     if (checks[i]) newChecks[newIdx] = true;
+    if (lockedIdx[i]) newLocked[newIdx] = true;
     newIdx++;
   }
   saveActiveChecks(newChecks);
+
+  const lock = getClaimLock();
+  lock[getActiveListLockId()] = newLocked;
+  saveClaimLock(lock);
   renderChecklist();
 }
 

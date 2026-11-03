@@ -678,6 +678,20 @@ body {
   transform: scale(1.15);
 }
 
+/* Habits whose coins were claimed: locked until the next day */
+.habit-item.claimed-locked .habit-left {
+  cursor: not-allowed;
+}
+
+.habit-item.claimed-locked .delete-btn,
+.habit-item.claimed-locked .delete-btn:hover {
+  cursor: not-allowed;
+  color: #fbbf24;
+  font-size: 0.85rem;
+  opacity: 0.9 !important;
+  transform: none;
+}
+
 /* =========================================================================
    CHECKLIST FOOTER - 2-COLUMN LAYOUT (COMMIT & INPUT LEFT, PIGGYBANK RIGHT)
    ========================================================================= */
