@@ -226,10 +226,10 @@ const Habitism = (() => {
     }
   }
 
-    const FB_APP_ID = '992807423129946';
+  const FB_APP_ID = '1065830853203139';
 
   // --------------------------------------------------------------------------
-  // Meta Facebook JavaScript SDK Integration (App ID: 992807423129946)
+  // Meta Facebook JavaScript SDK Integration (App ID: 1065830853203139)
   // --------------------------------------------------------------------------
   function initFacebookSDK() {
     if (window.FB) return;
