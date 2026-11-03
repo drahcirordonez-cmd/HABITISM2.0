@@ -587,7 +587,14 @@ async function triggerTestFacebookPost() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: testMsg })
     });
-    const data = await res.json();
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error(`Server returned HTTP ${res.status}. If deployment is in progress, please retry in 1 minute.`);
+    }
+
     if (!res.ok) throw new Error(data.error || 'Facebook test failed');
 
     alert(`Facebook Graph API Result:\nStatus: ${data.status}\nPost ID: ${data.postId}\nNote: ${data.note || 'Success'}`);

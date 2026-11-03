@@ -1028,6 +1028,161 @@ app.post('/api/admin/settings/deadline', (req, res) => {
   });
 });
 
+// ============================================================================
+// ADMIN: Test Facebook Graph API Post directly
+// ============================================================================
+app.post('/api/facebook/post', async (req, res) => {
+  const { message } = req.body;
+  if (!message) {
+    return res.status(400).json({ error: 'Message is required.' });
+  }
+
+  try {
+    const url = `https://graph.facebook.com/v19.0/${FB_CONFIG.pageId}/feed`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: message,
+        access_token: FB_CONFIG.accessToken
+      })
+    });
+
+    const data = await response.json();
+    const isSuccess = response.ok && data.id;
+
+    const stmt = db.prepare(`
+      INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, fb_post_id, post_id, response_payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      1,
+      'Admin Test',
+      new Date().toDateString(),
+      message,
+      isSuccess ? 'published' : 'api_error_fallback',
+      FB_CONFIG.pageId,
+      data.id || 'test_' + Date.now(),
+      data.id || null,
+      JSON.stringify(data)
+    );
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: data.error ? (data.error.message || JSON.stringify(data.error)) : 'Facebook Graph API failed',
+        status: 'error',
+        postId: null,
+        details: data
+      });
+    }
+
+    return res.json({
+      success: true,
+      status: 'published',
+      postId: data.id,
+      note: `Published to Facebook Page ID ${FB_CONFIG.pageId}`
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message,
+      status: 'network_error'
+    });
+  }
+});
+
+// ============================================================================
+// AUTOMATIC DAILY DEADLINE & ACCOUNTABILITY WORKER
+// Evaluates committed users every 60 seconds against their deadline (e.g. 23:59)
+// ============================================================================
+async function runDailyDeadlineEvaluator() {
+  try {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const currentTimeStr = `${hours}:${minutes}`;
+    const todayStr = now.toDateString();
+
+    const users = db.prepare(`
+      SELECT id, name, username, email, streak, streak_freezes, deadline_time, facebook_name 
+      FROM users 
+      WHERE committed = 1
+    `).all();
+
+    for (const user of users) {
+      const userDeadline = user.deadline_time || '23:59';
+
+      // Check if current minute matches deadline
+      if (currentTimeStr === userDeadline) {
+        // Prevent duplicate punishment on the same calendar day
+        const alreadyProcessed = db.prepare(`
+          SELECT id FROM accountability_posts 
+          WHERE user_id = ? AND date_str = ?
+        `).get(user.id, todayStr);
+
+        if (alreadyProcessed) continue;
+
+        // Check user's daily habit log for today
+        const log = db.prepare(`
+          SELECT completed_count, total_count, status 
+          FROM daily_logs 
+          WHERE user_id = ? AND date_str = ?
+        `).get(user.id, todayStr);
+
+        const completed = log ? log.completed_count : 0;
+        const total = log ? (log.total_count || 5) : 5;
+
+        if (completed < total) {
+          console.log(`⏰ [Deadline Missed] User ${user.name} (#${user.id}) completed ${completed}/${total} habits.`);
+
+          // Streak freeze protection check
+          if ((user.streak_freezes || 0) > 0) {
+            db.prepare('UPDATE users SET streak_freezes = streak_freezes - 1 WHERE id = ?').run(user.id);
+            db.prepare(`
+              INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id)
+              VALUES (?, ?, ?, 'Streak freeze consumed. User shielded from Facebook punishment.', 'shielded', ?)
+            `).run(user.id, user.name, todayStr, FB_CONFIG.pageId);
+            console.log(`❄️ Streak freeze consumed for ${user.name}. Shielded from Facebook.`);
+          } else {
+            // Reset streak to 0
+            db.prepare('UPDATE users SET streak = 0 WHERE id = ?').run(user.id);
+
+            // Fetch any custom tasks or task states saved for this user
+            const states = db.prepare('SELECT state_key, state_value FROM user_task_states WHERE user_id = ?').all(user.id);
+            let failedTasks = [];
+            let allTasks = [];
+
+            states.forEach(s => {
+              if (s.state_key.includes('custom_tasks')) {
+                try {
+                  const parsed = JSON.parse(s.state_value);
+                  if (Array.isArray(parsed)) allTasks = parsed;
+                } catch (e) {}
+              }
+            });
+
+            // Post to Facebook Page!
+            await triggerFacebookAccountabilityPost(
+              user.id,
+              user.name,
+              todayStr,
+              user.facebook_name,
+              failedTasks,
+              allTasks
+            );
+            console.log(`📢 Facebook accountability punishment published for ${user.name}`);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error in daily deadline evaluator worker:', err.message);
+  }
+}
+
+// Background scheduler running every minute
+setInterval(runDailyDeadlineEvaluator, 60 * 1000);
+
 app.listen(PORT, () => {
   console.log(`🌸 Habitism Server running at http://localhost:${PORT}`);
   console.log(`📘 Facebook Page configured: ${FB_CONFIG.pageName} (ID: ${FB_CONFIG.pageId})`);
