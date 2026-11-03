@@ -841,6 +841,7 @@ const Habitism = (() => {
     adminSetDeadline,
     claimPiggybank,
     restoreUserChecks,
-    syncPiggybank
+    syncPiggybank,
+    setUserStorage
   };
 })();
