@@ -1234,6 +1234,94 @@ function showToast(text) {
   }, 3000);
 }
 
+// ============================================================================
+// Feedback Modal Handlers
+// ============================================================================
+function openFeedbackModal() {
+  const user = Habitism.getCurrentUser();
+  const nameInput = document.getElementById("feedbackName");
+  const emailInput = document.getElementById("feedbackEmail");
+  const msgInput = document.getElementById("feedbackMessage");
+  const countEl = document.getElementById("feedbackCharCount");
+  const errEl = document.getElementById("feedbackError");
+
+  if (nameInput && user && user.name) {
+    nameInput.value = user.name;
+  }
+  if (emailInput && user && user.email) {
+    emailInput.value = user.email;
+  }
+  if (msgInput) {
+    msgInput.value = "";
+  }
+  if (countEl) {
+    countEl.innerText = "0";
+  }
+  if (errEl) {
+    errEl.style.display = "none";
+    errEl.innerText = "";
+  }
+
+  openModal("feedbackModal");
+}
+
+async function handleFeedbackSubmit(e) {
+  e.preventDefault();
+  const name = (document.getElementById("feedbackName")?.value || "").trim();
+  const email = (document.getElementById("feedbackEmail")?.value || "").trim();
+  const type = document.getElementById("feedbackType")?.value || "Idea";
+  const msgInput = document.getElementById("feedbackMessage");
+  const message = (msgInput?.value || "").trim();
+  const errEl = document.getElementById("feedbackError");
+  const submitBtn = document.getElementById("feedbackSubmitBtn");
+
+  if (!message) {
+    if (errEl) {
+      errEl.innerText = "Please enter your feedback message.";
+      errEl.style.display = "block";
+    }
+    if (msgInput) msgInput.focus();
+    return;
+  }
+
+  if (message.length > 1000) {
+    if (errEl) {
+      errEl.innerText = "Feedback message cannot exceed 1000 characters.";
+      errEl.style.display = "block";
+    }
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>Submitting...</span>`;
+  }
+
+  try {
+    await Habitism.submitFeedback({
+      name: name || null,
+      email: email || null,
+      type,
+      message
+    });
+
+    closeModal("feedbackModal");
+    showToast("Thank you for your feedback!");
+
+    if (msgInput) msgInput.value = "";
+  } catch (err) {
+    if (errEl) {
+      errEl.innerText = err.message || "Failed to submit feedback. Please try again.";
+      errEl.style.display = "block";
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<span>Submit Feedback →</span>`;
+    }
+  }
+}
+
 function escapeHtml(str) {
   if (!str) return "";
   return str.replace(/[&<>'"]/g, 
@@ -1641,6 +1729,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initGlobalTooltip();
   updateNavbarBadges();
+
+  // 💬 Feedback character counter
+  const feedbackMsg = document.getElementById("feedbackMessage");
+  if (feedbackMsg) {
+    feedbackMsg.addEventListener("input", () => {
+      const counter = document.getElementById("feedbackCharCount");
+      if (counter) counter.innerText = feedbackMsg.value.length;
+    });
+  }
 
   // 📱 Mobile navbar hamburger menu
   const navToggle = document.getElementById("navMobileToggle");

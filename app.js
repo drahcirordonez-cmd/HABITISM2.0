@@ -213,6 +213,35 @@ const Habitism = (() => {
     return data;
   }
 
+  async function submitFeedback(feedbackData) {
+    const user = getCurrentUser();
+    const payload = {
+      userId: user ? user.id : null,
+      name: user ? user.name : null,
+      email: user ? user.email : null,
+      ...(typeof feedbackData === 'object' ? feedbackData : {})
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const err = new Error(data.error || 'Failed to submit feedback');
+        err.field = data.field;
+        throw err;
+      }
+      return data;
+    } catch (err) {
+      if (err.field) throw err;
+      console.warn('Backend unavailable for feedback, local fallback:', err.message);
+      return { success: true, message: 'Thank you for your feedback!' };
+    }
+  }
+
   const FB_APP_ID = '1065830853203139';
 
   // --------------------------------------------------------------------------
@@ -667,6 +696,35 @@ const Habitism = (() => {
     });
   }
 
+  async function adminGetFeedback() {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/feedback`, {
+        headers: { 'x-admin-id': user.id }
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating admin feedback:', err.message);
+      return {
+        success: true,
+        isOffline: true,
+        feedback: []
+      };
+    }
+  }
+
+  async function adminUpdateFeedbackStatus(feedbackId, status) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
+
+    return await fetchJson(`${API_BASE}/api/admin/feedback/${feedbackId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
+      body: JSON.stringify({ status })
+    });
+  }
+
   async function adminGetAccountabilityFeed() {
     const user = getCurrentUser();
     if (!user || user.role !== 'admin') throw new Error('Unauthorized');
@@ -915,6 +973,7 @@ const Habitism = (() => {
     checkAvailability,
     login,
     forgotPassword,
+    submitFeedback,
     FB_APP_ID,
     initFacebookSDK,
     loginWithFacebook,
@@ -934,6 +993,8 @@ const Habitism = (() => {
     adminGetPasswordRequests,
     adminApprovePasswordRequest,
     adminRejectPasswordRequest,
+    adminGetFeedback,
+    adminUpdateFeedbackStatus,
     adminGetAccountabilityFeed,
     adminStreakFreeze,
     adminUnlockChecks,

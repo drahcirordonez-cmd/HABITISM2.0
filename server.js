@@ -108,6 +108,17 @@ db.exec(`
     status TEXT DEFAULT 'pending',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    name TEXT,
+    email TEXT,
+    type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'new',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Safe column migrations in case existing habitism.db lacks columns
@@ -608,6 +619,51 @@ app.post('/api/auth/forgot-password', (req, res) => {
   } catch (err) {
     console.error('Error recording password change request:', err.message);
     return res.status(500).json({ error: 'Failed to record password change request.' });
+  }
+});
+
+// ============================================================================
+// USER FEEDBACK API
+// ============================================================================
+app.post('/api/feedback', (req, res) => {
+  const { userId, user_id, name, email, type, message } = req.body || {};
+
+  const cleanMessage = (message || '').trim();
+  if (!cleanMessage) {
+    return res.status(400).json({ error: 'Message is required.', field: 'message' });
+  }
+  if (cleanMessage.length > 1000) {
+    return res.status(400).json({ error: 'Message cannot exceed 1000 characters.', field: 'message' });
+  }
+
+  // Normalize feedback type
+  const rawType = (type || '').trim().toLowerCase();
+  let cleanType = 'Idea';
+  if (rawType.includes('bug')) cleanType = 'Bug Report';
+  else if (rawType.includes('concern')) cleanType = 'Concern';
+  else cleanType = 'Idea';
+
+  const cleanName = (name || '').trim().slice(0, 100) || null;
+  const cleanEmail = (email || '').trim().slice(0, 100) || null;
+  const targetUserId = parseInt(userId || user_id, 10) || null;
+
+  try {
+    const insert = db.prepare(`
+      INSERT INTO feedback (user_id, name, email, type, message, status, created_at)
+      VALUES (?, ?, ?, ?, ?, 'new', CURRENT_TIMESTAMP)
+    `);
+    const result = insert.run(targetUserId, cleanName, cleanEmail, cleanType, cleanMessage);
+
+    console.log(`💬 New feedback #${result.lastInsertRowid} received: [${cleanType}] from ${cleanName || (targetUserId ? 'User #' + targetUserId : 'Anonymous')}`);
+
+    return res.json({
+      success: true,
+      message: 'Thank you for your feedback!',
+      feedbackId: result.lastInsertRowid
+    });
+  } catch (err) {
+    console.error('Error saving feedback:', err.message);
+    return res.status(500).json({ error: 'Failed to submit feedback. Please try again.' });
   }
 });
 
@@ -1135,6 +1191,66 @@ app.post('/api/admin/password-requests/:id/reject', (req, res) => {
     message: `Password change request for @${request.username} has been rejected.`,
     requestId: request.id,
     targetUsername: request.username
+  });
+});
+
+// ============================================================================
+// ADMIN: User Feedback Management (Admin only)
+// ============================================================================
+
+// 1. Get all feedback submissions (Admin only)
+app.get('/api/admin/feedback', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  try {
+    const feedbackList = db.prepare(`
+      SELECT f.id, f.user_id, f.name, f.email, f.type, f.message, f.status, f.created_at,
+             u.username, u.username as account_username,
+             u.email as user_account_email, u.email as account_email
+      FROM feedback f
+      LEFT JOIN users u ON f.user_id = u.id
+      ORDER BY f.id DESC
+    `).all();
+
+    return res.json({ success: true, feedback: feedbackList });
+  } catch (err) {
+    console.error('Error fetching admin feedback:', err.message);
+    return res.status(500).json({ error: 'Failed to retrieve feedback.' });
+  }
+});
+
+// 2. Update feedback status (Admin only)
+app.post('/api/admin/feedback/:id/status', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const feedbackId = req.params.id;
+  const { status } = req.body || {};
+
+  const validStatuses = ['new', 'read', 'resolved'];
+  const normStatus = (status || '').toLowerCase().trim();
+  if (!validStatuses.includes(normStatus)) {
+    return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+  }
+
+  const feedback = db.prepare('SELECT id FROM feedback WHERE id = ?').get(feedbackId);
+  if (!feedback) {
+    return res.status(404).json({ error: 'Feedback record not found.' });
+  }
+
+  db.prepare('UPDATE feedback SET status = ? WHERE id = ?').run(normStatus, feedbackId);
+  console.log(`💬 Admin #${adminId} updated feedback #${feedbackId} status to "${normStatus}"`);
+
+  return res.json({
+    success: true,
+    message: `Feedback status updated to ${normStatus}.`,
+    id: Number(feedbackId),
+    status: normStatus
   });
 });
 

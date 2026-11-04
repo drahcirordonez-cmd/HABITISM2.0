@@ -23,6 +23,7 @@ function initAdminDashboard() {
 
   loadAdminData();
   loadPasswordRequests();
+  loadFeedback();
   loadAccountabilityFeed();
 
   // Attach search listeners
@@ -744,6 +745,280 @@ async function rejectPasswordRequest(requestId, username) {
 // Quick Adjust: Calendar (opens modal with target user preselected)
 function quickAdjustCalendar(userId) {
   openAdminCalendarModal(userId);
+}
+
+// ==========================================================================
+// User Feedback System (Admin Review & Status Management)
+// ==========================================================================
+let allFeedback = [];
+let currentDetailFeedback = null;
+
+async function loadFeedback() {
+  const tbody = document.getElementById('feedbackTableBody');
+  const countBadge = document.getElementById('feedbackCountBadge');
+  const newBadge = document.getElementById('feedbackNewBadge');
+
+  try {
+    const res = await Habitism.adminGetFeedback();
+    if (!res.success) throw new Error(res.error || 'Failed to load feedback');
+
+    allFeedback = res.feedback || [];
+
+    if (countBadge) countBadge.innerText = `${allFeedback.length} Total`;
+    if (newBadge) {
+      const newCount = allFeedback.filter(f => (f.status || 'new').toLowerCase() === 'new').length;
+      newBadge.innerText = `${newCount} New`;
+    }
+
+    filterAndRenderFeedback();
+  } catch (err) {
+    console.error('Error loading feedback:', err);
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 2rem; color: #f87171;">
+            Failed to load user feedback submissions: ${escapeHtml(err.message)}
+          </td>
+        </tr>
+      `;
+    }
+  }
+}
+
+function filterAndRenderFeedback() {
+  const statusFilter = (document.getElementById('feedbackStatusFilter')?.value || 'all').toLowerCase();
+  const typeFilter = document.getElementById('feedbackTypeFilter')?.value || 'all';
+
+  let filtered = [...allFeedback];
+
+  if (statusFilter !== 'all') {
+    filtered = filtered.filter(f => (f.status || 'new').toLowerCase() === statusFilter);
+  }
+
+  if (typeFilter !== 'all') {
+    filtered = filtered.filter(f => (f.type || '').toLowerCase() === typeFilter.toLowerCase());
+  }
+
+  renderFeedback(filtered);
+}
+
+function renderFeedback(feedbackList) {
+  const tbody = document.getElementById('feedbackTableBody');
+  if (!tbody) return;
+
+  if (feedbackList.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+          No feedback submissions match the current filter.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = feedbackList.map(item => {
+    const id = item.id;
+    const type = item.type || 'Idea';
+    const status = (item.status || 'new').toLowerCase();
+    
+    // Submitter display: Name, Account, or Anonymous
+    const accountUser = item.account_username || item.username;
+    let submitterDisplay = '<span style="color: #94a3b8; font-style: italic;">Anonymous</span>';
+    if (item.name && accountUser) {
+      submitterDisplay = `<strong>${escapeHtml(item.name)}</strong> <span style="color: #94a3b8; font-size: 0.8rem;">(@${escapeHtml(accountUser)})</span>`;
+    } else if (item.name) {
+      submitterDisplay = `<strong>${escapeHtml(item.name)}</strong>`;
+    } else if (accountUser) {
+      submitterDisplay = `<strong style="color: #38bdf8;">@${escapeHtml(accountUser)}</strong>`;
+    }
+
+    // Type badge styling
+    let typeBadgeStyle = 'background: rgba(147, 51, 234, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc;';
+    let typeIcon = '💡';
+    if (type.toLowerCase() === 'concern') {
+      typeBadgeStyle = 'background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24;';
+      typeIcon = '⚠️';
+    } else if (type.toLowerCase() === 'bug report') {
+      typeBadgeStyle = 'background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;';
+      typeIcon = '🐞';
+    }
+
+    // Status badge styling
+    let statusBadgeStyle = 'background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24;';
+    let statusLabel = 'New';
+    if (status === 'read') {
+      statusBadgeStyle = 'background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;';
+      statusLabel = 'Read';
+    } else if (status === 'resolved') {
+      statusBadgeStyle = 'background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80;';
+      statusLabel = 'Resolved';
+    }
+
+    // Message preview (truncate to 60 chars)
+    const rawMsg = item.message || '';
+    const previewMsg = rawMsg.length > 60 ? rawMsg.substring(0, 60) + '…' : rawMsg;
+
+    // Date formatted
+    const dateStr = item.created_at ? new Date(item.created_at).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : '--';
+
+    return `
+      <tr style="cursor: pointer;" onclick="openFeedbackDetail(${id})" title="Click row to view full feedback message">
+        <td><strong style="color: #94a3b8; font-size: 0.82rem;">#${id}</strong></td>
+        <td>${submitterDisplay}</td>
+        <td>
+          <span class="admin-badge" style="${typeBadgeStyle} font-size: 0.76rem;">
+            ${typeIcon} ${escapeHtml(type)}
+          </span>
+        </td>
+        <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd5e1;">
+          ${escapeHtml(previewMsg)}
+        </td>
+        <td style="font-size: 0.8rem; color: #94a3b8;">${dateStr}</td>
+        <td>
+          <span class="admin-badge" style="${statusBadgeStyle} font-size: 0.76rem;">
+            ${statusLabel}
+          </span>
+        </td>
+        <td style="text-align: right;" onclick="event.stopPropagation()">
+          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 4px 10px; font-size: 0.78rem;" onclick="openFeedbackDetail(${id})">
+            <span>View</span>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openFeedbackDetail(feedbackId) {
+  const item = allFeedback.find(f => f.id === Number(feedbackId));
+  if (!item) return;
+
+  currentDetailFeedback = item;
+
+  const modal = document.getElementById('feedbackDetailModal');
+  const idBadge = document.getElementById('detailFeedbackIdBadge');
+  const userEl = document.getElementById('detailFeedbackUser');
+  const emailEl = document.getElementById('detailFeedbackEmail');
+  const typeEl = document.getElementById('detailFeedbackType');
+  const dateEl = document.getElementById('detailFeedbackDate');
+  const messageEl = document.getElementById('detailFeedbackMessage');
+  const msgEl = document.getElementById('feedbackDetailStatusMsg');
+
+  if (idBadge) idBadge.innerText = `#${item.id}`;
+
+  const accountUser = item.account_username || item.username;
+  let userText = 'Anonymous';
+  if (item.name && accountUser) {
+    userText = `${item.name} (@${accountUser})`;
+  } else if (item.name) {
+    userText = item.name;
+  } else if (accountUser) {
+    userText = `@${accountUser}`;
+  }
+  if (userEl) userEl.innerText = userText;
+
+  const contactEmail = item.email || item.account_email || item.user_account_email || 'None provided';
+  if (emailEl) emailEl.innerText = contactEmail;
+
+  if (typeEl) {
+    typeEl.innerText = item.type || 'Idea';
+    if ((item.type || '').toLowerCase() === 'concern') {
+      typeEl.style.color = '#fbbf24';
+    } else if ((item.type || '').toLowerCase() === 'bug report') {
+      typeEl.style.color = '#f87171';
+    } else {
+      typeEl.style.color = '#c084fc';
+    }
+  }
+
+  if (dateEl) {
+    dateEl.innerText = item.created_at ? new Date(item.created_at).toLocaleString() : '--';
+  }
+
+  if (messageEl) {
+    messageEl.innerText = item.message || '';
+  }
+
+  updateDetailStatusBadge(item.status || 'new');
+
+  if (msgEl) {
+    msgEl.style.display = 'none';
+    msgEl.innerText = '';
+  }
+
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+}
+
+function updateDetailStatusBadge(status) {
+  const statusBadge = document.getElementById('detailFeedbackStatusBadge');
+  if (!statusBadge) return;
+
+  const norm = (status || 'new').toLowerCase();
+  if (norm === 'read') {
+    statusBadge.innerText = 'Read';
+    statusBadge.style.cssText = 'background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.8rem;';
+  } else if (norm === 'resolved') {
+    statusBadge.innerText = 'Resolved';
+    statusBadge.style.cssText = 'background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; font-size: 0.8rem;';
+  } else {
+    statusBadge.innerText = 'New';
+    statusBadge.style.cssText = 'background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 0.8rem;';
+  }
+}
+
+function closeFeedbackDetailModal() {
+  const modal = document.getElementById('feedbackDetailModal');
+  if (modal) modal.style.display = 'none';
+  currentDetailFeedback = null;
+}
+
+async function handleUpdateFeedbackStatusAction(newStatus) {
+  if (!currentDetailFeedback) return;
+  const feedbackId = currentDetailFeedback.id;
+  const msgEl = document.getElementById('feedbackDetailStatusMsg');
+
+  try {
+    const res = await Habitism.adminUpdateFeedbackStatus(feedbackId, newStatus);
+    if (!res.success) throw new Error(res.error || 'Failed to update feedback status');
+
+    // Update in-memory feedback record
+    currentDetailFeedback.status = newStatus;
+    const itemInList = allFeedback.find(f => f.id === feedbackId);
+    if (itemInList) {
+      itemInList.status = newStatus;
+    }
+
+    updateDetailStatusBadge(newStatus);
+
+    if (msgEl) {
+      msgEl.style.display = 'block';
+      msgEl.style.color = '#34d399';
+      msgEl.innerText = `Status successfully updated to "${newStatus}".`;
+    }
+
+    // Refresh badges and table
+    const newBadge = document.getElementById('feedbackNewBadge');
+    if (newBadge) {
+      const newCount = allFeedback.filter(f => (f.status || 'new').toLowerCase() === 'new').length;
+      newBadge.innerText = `${newCount} New`;
+    }
+    filterAndRenderFeedback();
+  } catch (err) {
+    if (msgEl) {
+      msgEl.style.display = 'block';
+      msgEl.style.color = '#f87171';
+      msgEl.innerText = 'Error: ' + err.message;
+    }
+  }
 }
 
 // ==========================================================================

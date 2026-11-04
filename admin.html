@@ -44,7 +44,7 @@
           <span>Habit Dashboard</span>
         </a>
 
-        <button type="button" class="admin-btn admin-btn-secondary" onclick="loadAdminData(); loadPasswordRequests(); loadAccountabilityFeed();" title="Refresh state from database">
+        <button type="button" class="admin-btn admin-btn-secondary" onclick="loadAdminData(); loadPasswordRequests(); loadFeedback(); loadAccountabilityFeed();" title="Refresh state from database">
           <span>🔄</span>
           <span>Refresh</span>
         </button>
@@ -190,6 +190,65 @@
             <tr>
               <td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">
                 Loading pending password change requests...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- User Feedback Submissions Section -->
+    <section class="admin-panel" id="userFeedbackPanel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">
+            <span>💬</span>
+            <span>User Feedback</span>
+            <span id="feedbackCountBadge" class="admin-badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); margin-left: 8px;">0 Total</span>
+            <span id="feedbackNewBadge" class="admin-badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); margin-left: 4px;">0 New</span>
+          </div>
+          <div style="font-size: 0.82rem; color: #94a3b8; margin-top: 4px;">
+            Feedback, suggestions, and bug reports submitted by users &bull; Click any row to review and change status
+          </div>
+        </div>
+
+        <div class="panel-controls" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <select id="feedbackStatusFilter" class="admin-input" onchange="filterAndRenderFeedback()" style="width: auto; padding: 6px 12px; font-size: 0.84rem; cursor: pointer;">
+            <option value="all">All Statuses</option>
+            <option value="new">Status: New</option>
+            <option value="read">Status: Read</option>
+            <option value="resolved">Status: Resolved</option>
+          </select>
+          <select id="feedbackTypeFilter" class="admin-input" onchange="filterAndRenderFeedback()" style="width: auto; padding: 6px 12px; font-size: 0.84rem; cursor: pointer;">
+            <option value="all">All Types</option>
+            <option value="Idea">Type: Idea</option>
+            <option value="Concern">Type: Concern</option>
+            <option value="Bug Report">Type: Bug Report</option>
+          </select>
+          <button type="button" class="admin-btn admin-btn-secondary" onclick="loadFeedback()" title="Refresh feedback submissions">
+            <span>🔄</span>
+            <span>Refresh Feedback</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th style="width: 60px;">ID</th>
+              <th style="min-width: 140px;">User</th>
+              <th style="width: 120px;">Type</th>
+              <th>Message Preview</th>
+              <th style="width: 150px;">Date</th>
+              <th style="width: 110px;">Status</th>
+              <th style="width: 90px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="feedbackTableBody">
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                Loading user feedback submissions...
               </td>
             </tr>
           </tbody>
@@ -413,6 +472,83 @@
           <button type="submit" id="adminCalSubmitBtn" class="admin-btn admin-btn-primary">💾 Save Calendar Date</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- User Feedback Detail & Status Management Modal -->
+  <div id="feedbackDetailModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal-card" style="max-width: 580px;">
+      <div class="admin-modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h3 style="margin: 0; font-size: 1.2rem; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+            <span>💬</span>
+            <span>User Feedback Details</span>
+          </h3>
+          <span id="detailFeedbackIdBadge" class="admin-badge" style="background: rgba(147, 51, 234, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc;">#--</span>
+        </div>
+        <button type="button" onclick="closeFeedbackDetailModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer;">&times;</button>
+      </div>
+
+      <div class="admin-modal-body">
+        <!-- Submitter Meta Card -->
+        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; font-size: 0.85rem;">
+          <div>
+            <span style="color: #94a3b8; font-size: 0.74rem; display: block; margin-bottom: 2px;">Submitter:</span>
+            <strong id="detailFeedbackUser" style="color: #ffffff;">--</strong>
+          </div>
+          <div>
+            <span style="color: #94a3b8; font-size: 0.74rem; display: block; margin-bottom: 2px;">Contact Email:</span>
+            <span id="detailFeedbackEmail" style="color: #38bdf8;">--</span>
+          </div>
+          <div>
+            <span style="color: #94a3b8; font-size: 0.74rem; display: block; margin-bottom: 2px;">Type:</span>
+            <span id="detailFeedbackType" style="font-weight: 600;">--</span>
+          </div>
+          <div>
+            <span style="color: #94a3b8; font-size: 0.74rem; display: block; margin-bottom: 2px;">Submitted At:</span>
+            <span id="detailFeedbackDate" style="color: #cbd5e1;">--</span>
+          </div>
+        </div>
+
+        <!-- Full Feedback Message -->
+        <div style="margin-bottom: 16px;">
+          <div style="font-size: 0.82rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+            Full Message Content
+          </div>
+          <div id="detailFeedbackMessage" style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 14px; font-size: 0.92rem; line-height: 1.6; color: #f1f5f9; white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow-y: auto;">
+          </div>
+        </div>
+
+        <!-- Status Management Action Box -->
+        <div style="background: rgba(147, 51, 234, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 12px; padding: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+            <span style="font-size: 0.84rem; font-weight: 700; color: #cbd5e1;">Status:</span>
+            <span id="detailFeedbackStatusBadge" class="admin-badge">--</span>
+          </div>
+          <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 10px;">
+            Update review status:
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="admin-btn admin-btn-secondary" onclick="handleUpdateFeedbackStatusAction('new')" style="flex: 1; min-width: 110px;" title="Reset status to New">
+              <span>⚪</span>
+              <span>Mark New</span>
+            </button>
+            <button type="button" class="admin-btn admin-btn-primary" onclick="handleUpdateFeedbackStatusAction('read')" style="flex: 1; min-width: 110px;" title="Acknowledge feedback as read">
+              <span>👁️</span>
+              <span>Mark Read</span>
+            </button>
+            <button type="button" class="admin-btn" onclick="handleUpdateFeedbackStatusAction('resolved')" style="flex: 1; min-width: 110px; background: linear-gradient(135deg, #059669, #10b981); color: #ffffff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; padding: 8px 12px; font-size: 0.84rem;" title="Mark feedback as resolved">
+              <span>✅</span>
+              <span>Mark Resolved</span>
+            </button>
+          </div>
+          <div id="feedbackDetailStatusMsg" style="margin-top: 10px; font-size: 0.82rem; display: none;"></div>
+        </div>
+      </div>
+
+      <div class="admin-modal-footer">
+        <button type="button" class="admin-btn admin-btn-secondary" onclick="closeFeedbackDetailModal()">Close</button>
+      </div>
     </div>
   </div>
 

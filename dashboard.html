@@ -77,6 +77,12 @@
         <span>Accountability</span>
       </button>
 
+      <!-- Feedback Button -->
+      <button class="nav-btn-link btn-secondary nav-item-feedback" id="navBtnFeedback" onclick="openFeedbackModal()" title="Share your feedback, ideas, or report a bug">
+        <span>💬</span>
+        <span>Feedback</span>
+      </button>
+
       <!-- Admin Portal Button (Collapses into overflow) -->
       <a href="admin.html" class="nav-btn-link btn-secondary nav-item-admin" id="adminPortalBtn" style="display:none; border-color: rgba(251, 191, 36, 0.4); color: #fde68a; background: rgba(251, 191, 36, 0.12);" title="Open Administrator Management Dashboard">
         <span>👑</span>
@@ -114,6 +120,12 @@
           <button type="button" class="overflow-item" id="overflowItemAccountability" onclick="openAccountabilityModal()">
             <span>📢</span>
             <span>Accountability</span>
+          </button>
+
+          <!-- Feedback item in dropdown -->
+          <button type="button" class="overflow-item" id="overflowItemFeedback" onclick="openFeedbackModal()">
+            <span>💬</span>
+            <span>Feedback</span>
           </button>
 
           <!-- Admin item in dropdown -->
@@ -377,6 +389,53 @@
       <div id="accountabilityLog" style="margin-top: 14px; font-size: 0.82rem; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); min-height: 48px;">
         <span style="color: var(--text-muted);">Click above to test backend Graph API integration live.</span>
       </div>
+    </div>
+  </div>
+
+  <!-- 6. User Feedback Modal -->
+  <div class="modal-overlay" id="feedbackModal">
+    <div class="modal-card" style="max-width: 520px;">
+      <button class="modal-close" onclick="closeModal('feedbackModal')">&times;</button>
+      <div class="modal-title">💬 Share Your Feedback</div>
+      <div class="modal-subtitle">Help shape Habitism! Suggest ideas, report bugs, or share your thoughts.</div>
+
+      <form id="feedbackForm" onsubmit="handleFeedbackSubmit(event)" style="margin-top: 14px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 5px;">
+            <label for="feedbackName" style="font-size: 0.82rem; font-weight: 600; color: #cbd5e1;">Name <span style="color: #64748b; font-weight: 400;">(optional)</span></label>
+            <input type="text" id="feedbackName" placeholder="Your name" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 9px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #fff; outline: none; font-family: inherit;">
+          </div>
+          <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 5px;">
+            <label for="feedbackEmail" style="font-size: 0.82rem; font-weight: 600; color: #cbd5e1;">Email <span style="color: #64748b; font-weight: 400;">(optional)</span></label>
+            <input type="email" id="feedbackEmail" placeholder="Your email address" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 9px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #fff; outline: none; font-family: inherit;">
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px;">
+          <label for="feedbackType" style="font-size: 0.82rem; font-weight: 600; color: #cbd5e1;">Feedback Type <span style="color: #f87171;">*</span></label>
+          <select id="feedbackType" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 9px; background: #0f172a; border: 1px solid rgba(255,255,255,0.18); color: #fff; outline: none; cursor: pointer; font-family: inherit;">
+            <option value="Idea">💡 Idea / Feature Suggestion</option>
+            <option value="Concern">⚠️ Concern / General Question</option>
+            <option value="Bug Report">🐛 Bug Report / Technical Issue</option>
+          </select>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label for="feedbackMessage" style="font-size: 0.82rem; font-weight: 600; color: #cbd5e1;">Message <span style="color: #f87171;">*</span></label>
+            <span style="font-size: 0.74rem; color: #94a3b8;"><span id="feedbackCharCount">0</span> / 1000</span>
+          </div>
+          <textarea id="feedbackMessage" rows="5" maxlength="1000" placeholder="Describe your idea, report an issue, or tell us what you think..." required style="width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 9px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #fff; outline: none; resize: vertical; font-family: inherit; font-size: 0.9rem; line-height: 1.4;"></textarea>
+          <div id="feedbackError" style="color: #f87171; font-size: 0.8rem; display: none; margin-top: 2px;"></div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
+          <button type="button" class="nav-btn-link btn-secondary" onclick="closeModal('feedbackModal')">Cancel</button>
+          <button type="submit" id="feedbackSubmitBtn" class="nav-btn-link btn-primary" style="padding: 9px 20px;">
+            <span>Submit Feedback →</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
