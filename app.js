@@ -483,10 +483,15 @@ const Habitism = (() => {
   }
 
   async function setUserCalendarDay(userId, dateStr, count) {
+    const user = getCurrentUser();
+    const headers = { 'Content-Type': 'application/json' };
+    if (user && user.role === 'admin') {
+      headers['x-admin-id'] = user.id;
+    }
     try {
       const res = await fetch(`${API_BASE}/api/user/calendar/set-day`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ userId, dateStr, count })
       });
       return await res.json();
@@ -750,18 +755,13 @@ const Habitism = (() => {
 
   async function adminCalendar(targetUserId, dateStr, completedCount, totalCount, status) {
     const user = getCurrentUser();
-    if (!user || user.role !== 'admin') throw new Error('Unauthorized');
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
 
-    try {
-      return await fetchJson(`${API_BASE}/api/admin/users/${targetUserId}/calendar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
-        body: JSON.stringify({ dateStr, completedCount, totalCount, status })
-      });
-    } catch (err) {
-      console.warn('Backend unavailable, simulating admin calendar:', err.message);
-      return { success: true, message: 'Calendar updated (simulated mode).' };
-    }
+    return await fetchJson(`${API_BASE}/api/admin/users/${targetUserId}/calendar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id },
+      body: JSON.stringify({ dateStr, completedCount, totalCount, status })
+    });
   }
 
   async function adminStreak(targetUserId, streak) {

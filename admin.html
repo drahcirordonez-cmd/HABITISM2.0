@@ -121,6 +121,11 @@
             <option value="user">Standard Users</option>
             <option value="admin">Administrators</option>
           </select>
+
+          <button type="button" class="admin-btn admin-btn-primary" onclick="openAdminCalendarModal()" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 0.82rem; cursor: pointer;">
+            <span>📅</span>
+            <span>Edit User Calendar</span>
+          </button>
         </div>
       </div>
 
@@ -227,6 +232,10 @@
             <span>🔄</span>
             <span>Reset Checklist Progress (Uncheck All)</span>
           </button>
+          <button type="button" class="admin-btn admin-btn-secondary" onclick="openAdminCalendarModal(currentInspectUserId, currentInspectUsername)" style="padding: 5px 12px; font-size: 0.8rem;" title="Modify calendar date and habit count for this user">
+            <span>📅</span>
+            <span>Edit Calendar Date</span>
+          </button>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -282,6 +291,65 @@
         <div class="admin-modal-footer">
           <button type="button" class="admin-btn admin-btn-secondary" onclick="closePasswordResetModal()">Cancel</button>
           <button type="submit" class="admin-btn admin-btn-primary">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Calendar Modification Modal -->
+  <div id="adminCalendarModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal-card" style="max-width: 480px;">
+      <div class="admin-modal-header">
+        <h3 style="margin: 0; font-size: 1.15rem; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+          <span>📅</span>
+          <span>Manage User Calendar</span>
+        </h3>
+        <button type="button" onclick="closeAdminCalendarModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">&times;</button>
+      </div>
+
+      <form id="adminCalendarForm" onsubmit="handleAdminCalendarSubmit(event)">
+        <div class="admin-modal-body">
+          <p style="font-size: 0.86rem; color: #cbd5e1; margin: 0 0 1rem 0;">
+            Select a target user, pick any past, current, or future date, and set their completion status:
+          </p>
+
+          <!-- 1. Target User Select -->
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem;">
+            <label for="adminCalUserSelect" style="font-size: 0.82rem; font-weight: 600; color: #94a3b8;">Target User</label>
+            <select id="adminCalUserSelect" class="admin-input" required style="cursor: pointer;">
+              <option value="">-- Select a User --</option>
+            </select>
+          </div>
+
+          <!-- 2. Date Picker (Past, Present, or Future) -->
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem;">
+            <label for="adminCalDate" style="font-size: 0.82rem; font-weight: 600; color: #94a3b8;">Select Date (Past, Current, or Future)</label>
+            <input type="date" id="adminCalDate" class="admin-input" required>
+            <span style="font-size: 0.76rem; color: #64748b;">Admins can modify past, current, or future dates.</span>
+          </div>
+
+          <!-- 3. Completion Status -->
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem;">
+            <label for="adminCalStatus" style="font-size: 0.82rem; font-weight: 600; color: #94a3b8;">Completion Status</label>
+            <select id="adminCalStatus" class="admin-input" onchange="onAdminCalStatusChange()" style="cursor: pointer;">
+              <option value="completed">Completed (Habits Achieved)</option>
+              <option value="incomplete">Incomplete (Unfinished / Missed)</option>
+            </select>
+          </div>
+
+          <!-- 4. Completed Task Count -->
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem;">
+            <label for="adminCalCount" style="font-size: 0.82rem; font-weight: 600; color: #94a3b8;">Completed Task Count</label>
+            <input type="number" id="adminCalCount" class="admin-input" min="0" max="20" value="5" required>
+            <span style="font-size: 0.76rem; color: #64748b;">Visual Tiers: 0 = Incomplete / Empty, 5 = Tier 1 (Green), 6–7 = Tier 2 (Orange), 8+ = Tier 3 (White-Blue)</span>
+          </div>
+
+          <div id="adminCalMsg" style="font-size: 0.84rem; padding: 10px; border-radius: 6px; display: none;"></div>
+        </div>
+
+        <div class="admin-modal-footer">
+          <button type="button" class="admin-btn admin-btn-secondary" onclick="closeAdminCalendarModal()">Cancel</button>
+          <button type="submit" id="adminCalSubmitBtn" class="admin-btn admin-btn-primary">💾 Save Calendar Date</button>
         </div>
       </form>
     </div>

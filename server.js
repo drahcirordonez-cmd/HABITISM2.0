@@ -630,24 +630,49 @@ app.get('/api/user/state/get/:userId/:stateKey', (req, res) => {
 
 // --- Calendar & Full State Persistence Across Browsers ---
 
-// 1. Set Calendar Day count (clicked dates or completed tasks)
+// Helper: Normalize any date string (ISO YYYY-MM-DD or toDateString) into standard toDateString
+function normalizeDateStr(dateStr) {
+  if (!dateStr) return '';
+  const str = String(dateStr).trim();
+  const d = str.includes('-') && str.length === 10
+    ? new Date(str + 'T12:00:00')
+    : new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toDateString();
+  }
+  return str;
+}
+
+// 1. Set Calendar Day count (read-only for non-admins except today's checklist; admins can modify any date)
 app.post('/api/user/calendar/set-day', (req, res) => {
   const { userId, dateStr, count } = req.body;
   if (!userId || !dateStr) return res.status(400).json({ error: 'Missing userId or dateStr' });
+
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+  const isAdmin = verifyAdmin(adminId);
+
+  const normalizedDate = normalizeDateStr(dateStr);
+  const todayStr = new Date().toDateString();
+  const isToday = (dateStr === todayStr || normalizedDate === todayStr);
+
+  // Frontend and backend guard: non-admins cannot modify past or future calendar dates
+  if (!isAdmin && !isToday) {
+    return res.status(403).json({ error: 'Only admins can modify calendar dates.' });
+  }
 
   const completedCount = parseInt(count, 10) || 0;
   const status = completedCount >= 5 ? 'completed' : (completedCount > 0 ? 'in_progress' : 'empty');
 
   if (completedCount <= 0) {
-    db.prepare('DELETE FROM daily_logs WHERE user_id = ? AND date_str = ?').run(userId, dateStr);
+    db.prepare('DELETE FROM daily_logs WHERE user_id = ? AND date_str = ?').run(userId, normalizedDate);
   } else {
     db.prepare(`
-      INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
+INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
       VALUES (?, ?, ?, 5, ?)
       ON CONFLICT(user_id, date_str) DO UPDATE SET
         completed_count = excluded.completed_count,
         status = excluded.status
-    `).run(userId, dateStr, completedCount, status);
+    `).run(userId, normalizedDate, completedCount, status);
   }
 
   // Recalculate streak from continuous completed days
@@ -656,7 +681,7 @@ app.post('/api/user/calendar/set-day', (req, res) => {
   return res.json({
     success: true,
     userId,
-    dateStr,
+    dateStr: normalizedDate,
     completedCount,
     status
   });
@@ -722,21 +747,32 @@ app.post('/api/habits/save-day', async (req, res) => {
   const { userId, dateStr, completedCount, totalCount } = req.body;
   if (!userId || !dateStr) return res.status(400).json({ error: 'Missing required parameters.' });
 
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+  const isAdmin = verifyAdmin(adminId);
+
+  const normalizedDate = normalizeDateStr(dateStr);
+  const todayStr = new Date().toDateString();
+  const isToday = (dateStr === todayStr || normalizedDate === todayStr);
+
+  if (!isAdmin && !isToday) {
+    return res.status(403).json({ error: 'Only admins can modify calendar dates.' });
+  }
+
   const count = parseInt(completedCount, 10) || 0;
   const total = parseInt(totalCount, 10) || 0;
   const status = count >= 5 ? 'completed' : (count > 0 ? 'in_progress' : 'empty');
 
   if (count <= 0) {
-    db.prepare('DELETE FROM daily_logs WHERE user_id = ? AND date_str = ?').run(userId, dateStr);
+    db.prepare('DELETE FROM daily_logs WHERE user_id = ? AND date_str = ?').run(userId, normalizedDate);
   } else {
     db.prepare(`
-      INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
+INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(user_id, date_str) DO UPDATE SET
         completed_count = excluded.completed_count,
         total_count = excluded.total_count,
         status = excluded.status
-    `).run(userId, dateStr, count, total, status);
+    `).run(userId, normalizedDate, count, total, status);
   }
 
   let user = db.prepare('SELECT id, coins, piggybank_coins, streak, streak_freezes FROM users WHERE id = ?').get(userId);
@@ -744,11 +780,11 @@ app.post('/api/habits/save-day', async (req, res) => {
   return res.json({
     success: true,
     user,
+    dateStr: normalizedDate,
     completedCount: count,
     status
   });
 });
-
 
 // --- Sync Piggybank (client updates server piggybank on each toggle) ---
 app.post('/api/user/piggybank/sync', (req, res) => {
@@ -1090,14 +1126,18 @@ app.post('/api/admin/users/:targetUserId/streak', (req, res) => {
 // ============================================================================
 // ADMIN: Manage User's Calendar (daily log) for a specific date
 // ============================================================================
-app.post('/api/admin/users/:targetUserId/calendar', (req, res) => {
-  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+// ============================================================================
+// ADMIN: Modify Any User's Calendar (Past, Current, or Future Dates)
+// Route: POST /api/admin/users/:userId/calendar (and alias :targetUserId)
+// ============================================================================
+function handleAdminCalendarUpdate(req, res) {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
   if (!verifyAdmin(adminId)) {
     return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
   }
 
-  const targetId = req.params.targetUserId;
-  const { dateStr, completedCount, totalCount, status } = req.body;
+  const targetId = req.params.userId || req.params.targetUserId;
+  let { dateStr, completedCount, totalCount, status, count } = req.body;
   if (!dateStr) {
     return res.status(400).json({ error: 'dateStr is required.' });
   }
@@ -1105,26 +1145,53 @@ app.post('/api/admin/users/:targetUserId/calendar', (req, res) => {
   const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(targetId);
   if (!user) return res.status(404).json({ error: 'User not found.' });
 
+  const normalizedDate = normalizeDateStr(dateStr);
+
+  let numCount = parseInt(completedCount !== undefined ? completedCount : count, 10);
+  let normStatus = (status || '').toLowerCase().trim();
+
+  if (normStatus === 'completed') {
+    if (isNaN(numCount) || numCount <= 0) {
+      numCount = 5;
+    }
+    normStatus = 'completed';
+  } else if (normStatus === 'incomplete') {
+    if (isNaN(numCount)) numCount = 0;
+    normStatus = numCount > 0 ? 'in_progress' : 'incomplete';
+  } else {
+    if (isNaN(numCount)) numCount = 0;
+    normStatus = numCount >= 5 ? 'completed' : (numCount > 0 ? 'in_progress' : 'incomplete');
+  }
+
+  let totCount = parseInt(totalCount, 10);
+  if (isNaN(totCount) || totCount <= 0) {
+    totCount = Math.max(5, numCount);
+  }
+
   db.prepare(`
-    INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
+INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(user_id, date_str) DO UPDATE SET
       completed_count = excluded.completed_count,
       total_count = excluded.total_count,
       status = excluded.status
-  `).run(targetId, dateStr, completedCount || 0, totalCount || 0, status || 'in_progress');
+    `).run(targetId, normalizedDate, numCount, totCount, normStatus);
 
   return res.json({
     success: true,
     userId: targetId,
     username: user.username,
-    dateStr,
-    completedCount: completedCount || 0,
-    totalCount: totalCount || 0,
-    status: status || 'in_progress',
-    message: `Calendar updated for ${user.username} on ${dateStr}.`
+    dateStr: normalizedDate,
+    rawDateStr: dateStr,
+    completedCount: numCount,
+    totalCount: totCount,
+    status: normStatus,
+    message: `Calendar updated for ${user.username} on ${normalizedDate} (${numCount}/${totCount} habits, status: ${normStatus}).`
   });
-});
+}
+
+app.post('/api/admin/users/:userId/calendar', handleAdminCalendarUpdate);
+app.post('/api/admin/users/:targetUserId/calendar', handleAdminCalendarUpdate);
 
 // ============================================================================
 // ADMIN: Unlock user's claimed habit checkboxes (removes coin claim padlock)

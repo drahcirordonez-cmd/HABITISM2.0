@@ -173,7 +173,7 @@ function renderUsersTable(users) {
           <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustFreeze(${u.id})">❄️ Freeze</button>
           <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustCoins(${u.id})">🪙 Coins</button>
           <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustStreak(${u.id})">🔥 Streak</button>
-          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustCalendar(${u.id})">📅 Calendar</button>
+          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="openAdminCalendarModal(${u.id}, '${escapeHtml(u.username)}')" title="Manage user calendar & habit completion">📅 Calendar</button>
           </div>
         </td>
       </tr>
@@ -457,29 +457,160 @@ async function quickAdjustStreak(userId) {
 }
 
 // ==========================================================================
-// Quick Adjust: Calendar
+// Admin UI: Calendar Manipulation Modal
 // ==========================================================================
-async function quickAdjustCalendar(userId) {
-  const dateStr = prompt(`Enter date (YYYY-MM-DD) for user #${userId}:`, new Date().toISOString().split('T')[0]);
-  if (dateStr === null) return;
-  const completedCount = prompt('Completed tasks count:', '0');
-  if (completedCount === null) return;
-  const totalCount = prompt('Total tasks count:', '5');
-  if (totalCount === null) return;
-  const status = prompt('Status (in_progress/completed):', 'in_progress');
-  if (status === null) return;
+function populateAdminCalendarUserSelect(selectedUserId) {
+  const select = document.getElementById('adminCalUserSelect');
+  if (!select) return;
+
+  const usersList = allUsers && allUsers.length > 0 ? allUsers : [];
+  select.innerHTML = '<option value="">-- Select a User --</option>' +
+    usersList.map(u => {
+      const isSel = String(u.id) === String(selectedUserId);
+      const name = escapeHtml(u.name || u.username);
+      const uname = escapeHtml(u.username);
+      return `<option value="${u.id}" ${isSel ? 'selected' : ''}>#${u.id} - ${name} (@${uname})</option>`;
+    }).join('');
+}
+
+function openAdminCalendarModal(userId, username) {
+  const modal = document.getElementById('adminCalendarModal');
+  if (!modal) return;
+
+  populateAdminCalendarUserSelect(userId);
+
+  if (userId) {
+    const sel = document.getElementById('adminCalUserSelect');
+    if (sel) sel.value = String(userId);
+  }
+
+  const dateInput = document.getElementById('adminCalDate');
+  if (dateInput) {
+    dateInput.value = new Date().toISOString().split('T')[0];
+  }
+
+  const statusSelect = document.getElementById('adminCalStatus');
+  if (statusSelect) statusSelect.value = 'completed';
+
+  const countInput = document.getElementById('adminCalCount');
+  if (countInput) countInput.value = '5';
+
+  const msg = document.getElementById('adminCalMsg');
+  if (msg) {
+    msg.style.display = 'none';
+    msg.textContent = '';
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeAdminCalendarModal() {
+  const modal = document.getElementById('adminCalendarModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function onAdminCalStatusChange() {
+  const status = document.getElementById('adminCalStatus')?.value;
+  const countInput = document.getElementById('adminCalCount');
+  if (!countInput) return;
+
+  if (status === 'completed') {
+    if (parseInt(countInput.value, 10) < 5) {
+      countInput.value = '5';
+    }
+  } else if (status === 'incomplete') {
+    if (parseInt(countInput.value, 10) >= 5) {
+      countInput.value = '0';
+    }
+  }
+}
+
+async function handleAdminCalendarSubmit(e) {
+  e.preventDefault();
+  const userId = document.getElementById('adminCalUserSelect')?.value;
+  const dateStr = document.getElementById('adminCalDate')?.value;
+  const status = document.getElementById('adminCalStatus')?.value;
+  const count = parseInt(document.getElementById('adminCalCount')?.value, 10) || 0;
+  const msg = document.getElementById('adminCalMsg');
+  const submitBtn = document.getElementById('adminCalSubmitBtn');
+
+  if (!userId) {
+    if (msg) {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(239, 68, 68, 0.2)';
+      msg.style.color = '#f87171';
+      msg.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+      msg.textContent = 'Please select a target user.';
+    }
+    return;
+  }
+
+  if (!dateStr) {
+    if (msg) {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(239, 68, 68, 0.2)';
+      msg.style.color = '#f87171';
+      msg.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+      msg.textContent = 'Please pick a date.';
+    }
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+  }
 
   try {
-    const res = await Habitism.adminCalendar(userId, dateStr, parseInt(completedCount), parseInt(totalCount), status);
+    const totalCount = Math.max(5, count);
+    const res = await Habitism.adminCalendar(userId, dateStr, count, totalCount, status);
     if (res.success) {
-      alert(res.message);
-      loadAdminData();
+      if (msg) {
+        msg.style.display = 'block';
+        msg.style.background = 'rgba(34, 197, 94, 0.2)';
+        msg.style.color = '#4ade80';
+        msg.style.border = '1px solid rgba(34, 197, 94, 0.4)';
+        msg.textContent = '✅ ' + (res.message || 'Calendar updated successfully!');
+      }
+
+      await loadAdminData();
+
+      // If user inspection modal is open for this user, refresh it
+      if (currentInspectUserId && String(currentInspectUserId) === String(userId)) {
+        await inspectUser(userId);
+      }
+
+      setTimeout(() => {
+        closeAdminCalendarModal();
+      }, 1200);
     } else {
-      alert('Failed: ' + (res.error || res.message));
+      if (msg) {
+        msg.style.display = 'block';
+        msg.style.background = 'rgba(239, 68, 68, 0.2)';
+        msg.style.color = '#f87171';
+        msg.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        msg.textContent = '❌ ' + (res.error || res.message || 'Failed to update calendar.');
+      }
     }
   } catch (err) {
-    alert('Error: ' + err.message);
+    if (msg) {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(239, 68, 68, 0.2)';
+      msg.style.color = '#f87171';
+      msg.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+      msg.textContent = '❌ Error: ' + err.message;
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '💾 Save Calendar Date';
+    }
   }
+}
+
+// Quick Adjust: Calendar (opens modal with target user preselected)
+function quickAdjustCalendar(userId) {
+  openAdminCalendarModal(userId);
 }
 
 // ==========================================================================

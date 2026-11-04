@@ -532,7 +532,15 @@ function renderCalendar(date) {
       classes += "tier-green ";
     }
 
-    html += `<td class="${classes}" onclick="toggleCalendarDay('${cellDate}')" title="${cellDate} (${completedCount} habits)">${day}</td>`;
+    const currentLoggedInUser = Habitism.getCurrentUser();
+    const isUserAdmin = currentLoggedInUser && currentLoggedInUser.role === 'admin';
+
+    if (isUserAdmin) {
+      html += `<td class="${classes} admin-editable" onclick="toggleCalendarDay('${cellDate}')" title="${cellDate} (${completedCount} habits - click to toggle as admin)">${day}</td>`;
+    } else {
+      html += `<td class="${classes} calendar-cell-readonly" onclick="handleReadOnlyCalendarClick('${cellDate}')" title="${cellDate} (${completedCount} habits)">${day}</td>`;
+    }
+
     if ((day + firstDay) % 7 === 0 && day !== daysInMonth) {
       html += "</tr><tr>";
     }
@@ -543,7 +551,18 @@ function renderCalendar(date) {
   updateStreak();
 }
 
+function handleReadOnlyCalendarClick(cellDate) {
+  showToast("Only admins can modify calendar dates");
+}
+
 function toggleCalendarDay(cellDate) {
+  const user = Habitism.getCurrentUser();
+  const isAdmin = user && user.role === 'admin';
+  if (!isAdmin) {
+    showToast("Only admins can modify calendar dates");
+    return;
+  }
+
   const current = getDayCompletedCount(cellDate);
   let next = 0;
   if (current === 0) next = 5;       // Green

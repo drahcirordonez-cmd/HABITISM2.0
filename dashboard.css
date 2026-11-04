@@ -248,6 +248,14 @@ body {
   user-select: none;
 }
 
+#calendar td.calendar-cell-readonly {
+  cursor: default;
+}
+
+#calendar td.admin-editable {
+  cursor: pointer;
+}
+
 #calendar td:empty {
   background: transparent;
   border: none;
