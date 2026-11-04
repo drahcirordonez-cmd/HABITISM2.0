@@ -523,6 +523,9 @@ app.post('/api/auth/login', (req, res) => {
 // --- Authentication: Forgot / Reset Password Workflow (Admin Review Flow) ---
 app.post('/api/auth/forgot-password', (req, res) => {
   const {
+    identifier,
+    username,
+    email,
     creationDate,
     accountCreationDate,
     account_creation_date,
@@ -531,16 +534,34 @@ app.post('/api/auth/forgot-password', (req, res) => {
     newPassword,
     new_password,
     desiredNewPassword,
-    desired_new_password,
-    username,
-    identifier
+    desired_new_password
   } = req.body || {};
 
+  const cleanIdentifier = (identifier || username || email || '').trim().toLowerCase();
   const cleanCreationDate = (creationDate || accountCreationDate || account_creation_date || '').trim();
   const cleanLastPassword = (lastPassword || last_password || '').trim();
   const cleanNewPassword = (newPassword || new_password || desiredNewPassword || desired_new_password || '').trim();
 
-  // 1. Validate Account Creation Date
+  // 1. Validate Username or Email Address
+  if (!cleanIdentifier) {
+    return res.status(400).json({ error: 'Username or email address is required.', field: 'identifier' });
+  }
+
+  // 2. Look up user by username or email in database
+  const user = db.prepare(`
+    SELECT id, name, username, email, password, created_at 
+    FROM users 
+    WHERE LOWER(username) = ? OR LOWER(email) = ?
+  `).get(cleanIdentifier, cleanIdentifier);
+
+  if (!user) {
+    return res.status(400).json({
+      error: 'No account found matching this username / email address.',
+      field: 'identifier'
+    });
+  }
+
+  // 3. Validate Account Creation Date
   if (!cleanCreationDate) {
     return res.status(400).json({ error: 'Account creation date is required.', field: 'creationDate' });
   }
@@ -554,12 +575,12 @@ app.post('/api/auth/forgot-password', (req, res) => {
     return res.status(400).json({ error: 'Account creation date cannot be in the future.', field: 'creationDate' });
   }
 
-  // 2. Validate Last Remembered Password
+  // 4. Validate Last Remembered Password (required, but NOT verified against database—admin conducts review)
   if (!cleanLastPassword) {
     return res.status(400).json({ error: 'Last remembered password is required.', field: 'lastPassword' });
   }
 
-  // 3. Validate Desired New Password (min 8 chars)
+  // 5. Validate Desired New Password (min 8 chars)
   if (!cleanNewPassword) {
     return res.status(400).json({ error: 'Desired new password is required.', field: 'newPassword' });
   }
@@ -567,35 +588,9 @@ app.post('/api/auth/forgot-password', (req, res) => {
     return res.status(400).json({ error: 'Desired new password must be at least 8 characters.', field: 'newPassword' });
   }
 
-  // 4. Verify account exists in database matching creation date and last remembered password
-  let user;
-  const cleanUser = (username || identifier || '').trim().toLowerCase();
-  if (cleanUser) {
-    user = db.prepare(`
-      SELECT id, name, username, email, password, created_at 
-      FROM users 
-      WHERE (LOWER(username) = ? OR LOWER(email) = ?) 
-        AND DATE(created_at) = DATE(?) 
-        AND password = ?
-    `).get(cleanUser, cleanUser, cleanCreationDate, cleanLastPassword);
-  } else {
-    user = db.prepare(`
-      SELECT id, name, username, email, password, created_at 
-      FROM users 
-      WHERE DATE(created_at) = DATE(?) AND password = ?
-    `).get(cleanCreationDate, cleanLastPassword);
-  }
-
-  if (!user) {
-    return res.status(400).json({
-      error: 'No account found matching this creation date and last remembered password.',
-      field: 'lastPassword'
-    });
-  }
-
   const targetUsername = user.username || user.name || user.email;
 
-  // 5. Insert row into password_change_requests table with status 'pending'
+  // 6. Insert row into password_change_requests table with status 'pending'
   try {
     const insert = db.prepare(`
       INSERT INTO password_change_requests (user_id, username, account_creation_date, last_password, new_password, status, created_at)

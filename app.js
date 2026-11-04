@@ -192,12 +192,12 @@ const Habitism = (() => {
     }
   }
 
-  async function forgotPassword(creationDateOrData, lastPassword, newPassword) {
+  async function forgotPassword(identifierOrData, creationDate, lastPassword, newPassword) {
     let payload = {};
-    if (typeof creationDateOrData === 'object' && creationDateOrData !== null) {
-      payload = creationDateOrData;
+    if (typeof identifierOrData === 'object' && identifierOrData !== null) {
+      payload = identifierOrData;
     } else {
-      payload = { creationDate: creationDateOrData, lastPassword, newPassword };
+      payload = { identifier: identifierOrData, creationDate, lastPassword, newPassword };
     }
     const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
       method: 'POST',
