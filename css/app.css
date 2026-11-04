@@ -272,7 +272,7 @@ body {
   border-color: #ef4444;
 }
 
-/* 🌟 Facebook Auth Button */
+/* 🌟 Facebook Auth / Community Button */
 .btn-facebook {
   width: 100%;
   padding: 13px 20px;
@@ -289,6 +289,9 @@ body {
   gap: 12px;
   box-shadow: 0 6px 20px rgba(24, 119, 242, 0.35);
   transition: all 0.25s ease;
+  text-decoration: none;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .btn-facebook:hover {
