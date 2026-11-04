@@ -205,30 +205,50 @@
       }
     }
 
-    async function handleFacebookSignup() {
-      const errorEl = document.getElementById("signupError");
-      errorEl.style.display = "none";
-
+    function handleFacebookSignup() {
       try {
-        const user = await Habitism.loginWithFacebook();
-        if (user.role === 'admin') {
-          window.location.href = 'admin.html';
-        } else if (!user.committed) {
-          window.location.href = 'rules.html';
-        } else {
-          window.location.href = 'dashboard.html';
-        }
+        Habitism.loginWithFacebook();
       } catch (err) {
-        if (err.message && !err.message.includes('cancelled')) {
+        const errorEl = document.getElementById("signupError");
+        if (errorEl) {
           errorEl.innerText = err.message;
           errorEl.style.display = "block";
         }
       }
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      if (typeof Habitism !== 'undefined' && Habitism.initFacebookSDK) {
-        Habitism.initFacebookSDK();
+    // Process Facebook OAuth Redirect Return
+    window.addEventListener("DOMContentLoaded", async () => {
+      if (window.location.hash.includes('access_token=') || window.location.search.includes('error=')) {
+        const errorEl = document.getElementById("signupError");
+        if (errorEl) {
+          errorEl.innerText = 'Connecting with Facebook...';
+          errorEl.style.display = 'block';
+          errorEl.style.color = '#38bdf8';
+          errorEl.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+          errorEl.style.background = 'rgba(56, 189, 248, 0.12)';
+        }
+
+        try {
+          const user = await Habitism.checkFacebookRedirectCallback();
+          if (user) {
+            if (user.role === 'admin') {
+              window.location.href = 'admin.html';
+            } else if (!user.committed) {
+              window.location.href = 'rules.html';
+            } else {
+              window.location.href = 'dashboard.html';
+            }
+          }
+        } catch (err) {
+          if (errorEl) {
+            errorEl.innerText = err.message;
+            errorEl.style.display = 'block';
+            errorEl.style.color = '#f87171';
+            errorEl.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            errorEl.style.background = 'rgba(239, 68, 68, 0.12)';
+          }
+        }
       }
     });
   </script>

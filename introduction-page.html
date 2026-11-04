@@ -293,21 +293,10 @@
       }
     }
 
-    async function handleFacebookIntroLogin() {
-      try {
-        const user = await Habitism.loginWithFacebook();
-        if (user.role === 'admin') {
-          window.location.href = 'admin.html';
-        } else if (!user.committed) {
-          window.location.href = 'rules.html';
-        } else {
-          window.location.href = 'dashboard.html';
-        }
-      } catch (err) {
-        if (err.message && !err.message.includes('cancelled') && !err.message.includes('closed')) {
-          alert(err.message);
-        }
-      }
+    function handleFacebookIntroLogin() {
+      // Direct redirect to Facebook OAuth, returning directly to login.html
+      const returnUrl = window.location.origin + '/login.html';
+      Habitism.loginWithFacebook(returnUrl);
     }
 
     window.addEventListener("DOMContentLoaded", () => {

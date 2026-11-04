@@ -904,37 +904,58 @@
       }
     }
 
-    async function handleFacebookLogin() {
+    function handleFacebookLogin() {
       try {
-        const user = await Habitism.loginWithFacebook();
-        
-        if (user.role === 'admin') {
-          window.location.href = 'admin.html';
-        } else if (!user.committed) {
-          window.location.href = 'rules.html';
-        } else {
-          window.location.href = 'dashboard.html';
-        }
+        Habitism.loginWithFacebook();
       } catch (err) {
-        if (err.message && !err.message.includes('cancelled')) {
-          const errEl = document.getElementById('authError');
-          if (errEl) {
-            errEl.innerText = err.message;
-            errEl.style.display = 'block';
-          }
+        const errEl = document.getElementById('authError');
+        if (errEl) {
+          errEl.innerText = err.message;
+          errEl.style.display = 'block';
         }
       }
     }
 
-    // Auto-highlight if redirected from Introduction page with ?action=fb
-    window.addEventListener("DOMContentLoaded", () => {
-      Habitism.initFacebookSDK();
+    // Process Facebook OAuth Redirect Return or ?action=fb
+    window.addEventListener("DOMContentLoaded", async () => {
+      // 1. Check for incoming OAuth redirect callback
+      if (window.location.hash.includes('access_token=') || window.location.search.includes('error=')) {
+        const errEl = document.getElementById('authError');
+        if (errEl) {
+          errEl.innerText = 'Connecting with Facebook...';
+          errEl.style.display = 'block';
+          errEl.style.color = '#38bdf8';
+          errEl.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+          errEl.style.background = 'rgba(56, 189, 248, 0.12)';
+        }
+
+        try {
+          const user = await Habitism.checkFacebookRedirectCallback();
+          if (user) {
+            if (user.role === 'admin') {
+              window.location.href = 'admin.html';
+            } else if (!user.committed) {
+              window.location.href = 'rules.html';
+            } else {
+              window.location.href = 'dashboard.html';
+            }
+          }
+        } catch (err) {
+          if (errEl) {
+            errEl.innerText = err.message;
+            errEl.style.display = 'block';
+            errEl.style.color = '#f87171';
+            errEl.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            errEl.style.background = 'rgba(239, 68, 68, 0.12)';
+          }
+        }
+        return;
+      }
+
+      // 2. Auto-trigger if redirected from Introduction page with ?action=fb
       const params = new URLSearchParams(window.location.search);
       if (params.get('action') === 'fb') {
-        const fbBtn = document.querySelector('.btn-facebook');
-        if (fbBtn) {
-          fbBtn.focus();
-        }
+        handleFacebookLogin();
       }
     });
   </script>

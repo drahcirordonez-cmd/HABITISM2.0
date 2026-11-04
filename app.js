@@ -229,84 +229,53 @@ const Habitism = (() => {
   const FB_APP_ID = '1065830853203139';
 
   // --------------------------------------------------------------------------
-  // Meta Facebook JavaScript SDK Integration (App ID: 1065830853203139)
+  // Meta Facebook OAuth Integration (App ID: 1065830853203139)
+  // Direct Web OAuth Redirect Flow (Zero popups, 100% immune to popup blockers)
   // --------------------------------------------------------------------------
-  let fbInitPromise = null;
-
   function initFacebookSDK() {
-    if (fbInitPromise) return fbInitPromise;
-
-    fbInitPromise = new Promise((resolve) => {
-      if (window.FB && typeof window.FB.login === 'function') {
-        return resolve(window.FB);
-      }
-
-      window.fbAsyncInit = function() {
-        try {
-          window.FB.init({
-            appId: FB_APP_ID,
-            cookie: true,
-            xfbml: true,
-            version: 'v19.0'
-          });
-          console.log('✅ Meta Facebook SDK Initialized (App ID: ' + FB_APP_ID + ')');
-          resolve(window.FB);
-        } catch (e) {
-          console.warn('Facebook SDK init note:', e.message);
-          resolve(window.FB || null);
-        }
-      };
-
-      if (!document.getElementById('facebook-jssdk')) {
-        const js = document.createElement('script');
-        js.id = 'facebook-jssdk';
-        js.src = 'https://connect.facebook.net/en_US/sdk.js';
-        js.async = true;
-        js.defer = true;
-        js.crossOrigin = 'anonymous';
-        js.onerror = () => {
-          console.warn('Facebook SDK script failed to load.');
-          resolve(null);
-        };
-        document.head.appendChild(js);
-      }
-    });
-
-    return fbInitPromise;
+    // Kept for backward compatibility
   }
 
-  async function loginWithFacebook() {
-    // Ensure the SDK script is fully loaded and initialized
-    const FB = await initFacebookSDK();
+  function loginWithFacebook(customRedirectUri = null) {
+    const redirectUri = customRedirectUri || (window.location.origin + window.location.pathname);
+    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=public_profile,email`;
+    window.location.href = authUrl;
+  }
 
-    if (!FB || typeof FB.login !== 'function') {
-      throw new Error('Facebook SDK could not load. Please check your internet connection or ad blocker.');
+  async function checkFacebookRedirectCallback() {
+    // 1. Check for error returned by Facebook (e.g. user cancelled)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('error')) {
+      const errorMsg = urlParams.get('error_description') || urlParams.get('error_message') || 'Facebook login was cancelled.';
+      try {
+        history.replaceState(null, '', window.location.pathname);
+      } catch (e) {}
+      throw new Error(errorMsg);
     }
 
-    return new Promise((resolve, reject) => {
-      FB.login((response) => {
-        console.log('Facebook login response:', response);
+    // 2. Check for access_token in URL hash fragment
+    const hash = window.location.hash;
+    if (!hash || !hash.includes('access_token=')) return null;
 
-        if (response && response.authResponse) {
-          const accessToken = response.authResponse.accessToken;
-          FB.api('/me', { fields: 'id,name,email' }, async (userInfo) => {
-            try {
-              const user = await facebookLogin(userInfo.name, userInfo.email, userInfo.id, accessToken);
-              resolve(user);
-            } catch (err) {
-              resolve(createOfflineFbUser(userInfo.name, userInfo.email, userInfo.id));
-            }
-          });
-        } else {
-          const status = response ? response.status : 'unknown';
-          if (status === 'unknown') {
-            reject(new Error('Facebook authentication was closed or blocked. Please make sure popups are allowed for this site.'));
-          } else {
-            reject(new Error(`Facebook login cancelled (${status}).`));
-          }
-        }
-      }, { scope: 'public_profile,email' });
-    });
+    const hashParams = new URLSearchParams(hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    if (!accessToken) return null;
+
+    // Clean hash fragment from browser address bar immediately
+    try {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    } catch (e) {}
+
+    // Fetch user details from Facebook Graph API using access token
+    const res = await fetch(`https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email`);
+    const userInfo = await res.json();
+    if (userInfo.error) {
+      throw new Error(userInfo.error.message || 'Failed to retrieve Facebook profile.');
+    }
+
+    // Authenticate / create user in Habitism backend
+    const user = await facebookLogin(userInfo.name, userInfo.email, userInfo.id, accessToken);
+    return user;
   }
 
   function createOfflineFbUser(name, email = null, id = null) {
@@ -860,6 +829,7 @@ const Habitism = (() => {
     FB_APP_ID,
     initFacebookSDK,
     loginWithFacebook,
+    checkFacebookRedirectCallback,
     facebookLogin,
     linkFacebook,
     unlinkFacebook,
