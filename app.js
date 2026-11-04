@@ -128,41 +128,19 @@ const Habitism = (() => {
   // 2. Authentication API (Server + Client fallback)
   // ==========================================================================
   async function register(name, username, email, password) {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, username, email, password })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const error = new Error(data.error || 'Registration failed');
-        error.field = data.field;
-        throw error;
-      }
-      setCurrentUser(data.user);
-      return data.user;
-    } catch (err) {
-      if (err.message.includes('already registered') || err.message.includes('already taken')) {
-        throw err;
-      }
-      console.warn('Backend unavailable, using isolated local registration:', err.message);
-      const user = {
-        id: Date.now(),
-        name,
-        username: username || email.split('@')[0],
-        email,
-        password,
-        role: 'user',
-        committed: 0,
-        coins: 100,
-        streak: 0,
-        streak_freezes: 1,
-        task_mode: 'presets'
-      };
-      setCurrentUser(user);
-      return user;
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, username, email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const error = new Error(data.error || 'Registration failed');
+      error.field = data.field;
+      throw error;
     }
+    setCurrentUser(data.user);
+    return data.user;
   }
 
   async function login(identifier, password) {

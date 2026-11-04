@@ -334,17 +334,105 @@ Discipline Penalty: Daily streak has been broken and reset to 0 days.
 // 3. API ROUTES
 // ============================================================================
 
+// ============================================================================
+// STRICT SERVER-SIDE VALIDATION HELPERS
+// Ensures invalid inputs can NEVER be saved into the database.
+// ============================================================================
+function serverValidateName(value) {
+  const name = (value || '').trim();
+  if (!name) return "Name is required.";
+  const allowedRegex = /^[a-zA-Z\s\-'.]+$/;
+  if (!allowedRegex.test(name) || !/[a-zA-Z]/.test(name)) {
+    return "Name cannot contain numbers or special characters.";
+  }
+  return null;
+}
+
+function serverValidateEmail(value) {
+  const raw = value || '';
+  if (!raw.trim()) return "Email address is required.";
+  if (/\s/.test(raw)) return "Email cannot contain spaces.";
+  const email = raw.trim();
+
+  const atMatches = email.match(/@/g);
+  if (!atMatches || atMatches.length === 0) return "Email must contain an '@' symbol.";
+  if (atMatches.length > 1) return "Email can only contain one '@' symbol.";
+  if (email.includes('..')) return "Email cannot contain consecutive dots.";
+
+  const atIndex = email.indexOf('@');
+  const localPart = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
+
+  if (!localPart) return "Email is missing a username before '@'.";
+  if (!domain) return "Email is missing a domain after '@' (e.g., example.com).";
+  if (localPart.startsWith('.') || localPart.endsWith('.')) return "Email username cannot start or end with a dot.";
+  if (!/^[a-zA-Z0-9._-]+$/.test(localPart)) return "Email username can only contain letters, numbers, dots, underscores, and hyphens.";
+  if (domain.startsWith('.') || domain.endsWith('.')) return "Email domain cannot start or end with a dot.";
+  if (!domain.includes('.')) return "Email domain must contain at least one dot (e.g., example.com).";
+
+  const domainParts = domain.split('.');
+  const tld = domainParts[domainParts.length - 1];
+
+  for (let i = 0; i < domainParts.length - 1; i++) {
+    const part = domainParts[i];
+    if (!part) return "Email domain contains an empty segment.";
+    if (!/^[a-zA-Z0-9-]+$/.test(part)) return "Email domain contains invalid characters.";
+    if (part.startsWith('-') || part.endsWith('-')) return "Email domain segments cannot start or end with a hyphen.";
+  }
+
+  if (!/^[a-zA-Z]{2,}$/.test(tld)) return "Email must include a valid top-level domain like .com";
+  return null;
+}
+
+function serverValidatePassword(value) {
+  const password = value || '';
+  if (!password) return "Password is required.";
+  if (password.length < 8) return "Password must be at least 8 characters.";
+  return null;
+}
+
+function serverValidateUsername(value) {
+  const username = (value || '').trim();
+  if (!username) return "Username is required.";
+  if (username.length < 3) return "Username must be at least 3 characters.";
+  if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+    return "Username can only contain letters, numbers, underscores, and hyphens.";
+  }
+  return null;
+}
+
 // --- Authentication: Registration (Dedicated for Sign-Up Page) ---
 app.post('/api/auth/register', (req, res) => {
   const { name, username, email, password } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'Name, email, and password are required.' });
+
+  // 1. Strict Server Validation: Name
+  const nameError = serverValidateName(name);
+  if (nameError) {
+    return res.status(400).json({ error: nameError, field: 'name' });
+  }
+
+  // 2. Strict Server Validation: Email
+  const emailError = serverValidateEmail(email);
+  if (emailError) {
+    return res.status(400).json({ error: emailError, field: 'email' });
+  }
+
+  // 3. Strict Server Validation: Password
+  const passwordError = serverValidatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError, field: 'password' });
   }
 
   const cleanUsername = (username || email.split('@')[0]).trim().toLowerCase();
   const cleanEmail = email.trim().toLowerCase();
 
-  // Check username/email uniqueness against database
+  // 4. Strict Server Validation: Username
+  const usernameError = serverValidateUsername(cleanUsername);
+  if (usernameError) {
+    return res.status(400).json({ error: usernameError, field: 'username' });
+  }
+
+  // 5. Check username/email uniqueness against database
   const existing = db.prepare(`
     SELECT id, username, email FROM users 
     WHERE LOWER(username) = ? OR LOWER(email) = ?
@@ -358,6 +446,7 @@ app.post('/api/auth/register', (req, res) => {
     });
   }
 
+  // All requirements strictly verified -> safely insert into database
   try {
     const insert = db.prepare(`
       INSERT INTO users (name, username, email, password, role, committed, coins, streak, streak_freezes)

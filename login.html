@@ -884,10 +884,26 @@
 
     async function handleAuthSubmit(e) {
       e.preventDefault();
-      const identifier = document.getElementById('authIdentifier').value.trim();
-      const password = document.getElementById('authPassword').value;
+      const identifierInput = document.getElementById('authIdentifier');
+      const passwordInput = document.getElementById('authPassword');
+      const identifier = identifierInput.value.trim();
+      const password = passwordInput.value;
       const errEl = document.getElementById('authError');
       errEl.style.display = 'none';
+
+      // Check sign-in requirements before sending any request
+      if (!identifier) {
+        errEl.innerText = 'Please enter your username or email address.';
+        errEl.style.display = 'block';
+        identifierInput.focus();
+        return;
+      }
+      if (!password) {
+        errEl.innerText = 'Please enter your password.';
+        errEl.style.display = 'block';
+        passwordInput.focus();
+        return;
+      }
 
       try {
         const user = await Habitism.login(identifier, password);
