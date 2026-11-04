@@ -344,6 +344,20 @@ app.post('/api/auth/register', (req, res) => {
   const cleanUsername = (username || email.split('@')[0]).trim().toLowerCase();
   const cleanEmail = email.trim().toLowerCase();
 
+  // Check username/email uniqueness against database
+  const existing = db.prepare(`
+    SELECT id, username, email FROM users 
+    WHERE LOWER(username) = ? OR LOWER(email) = ?
+  `).get(cleanUsername, cleanEmail);
+
+  if (existing) {
+    const isEmail = existing.email && existing.email.toLowerCase() === cleanEmail;
+    return res.status(400).json({ 
+      error: 'This username/email is already registered.',
+      field: isEmail ? 'email' : 'username'
+    });
+  }
+
   try {
     const insert = db.prepare(`
       INSERT INTO users (name, username, email, password, role, committed, coins, streak, streak_freezes)
@@ -355,13 +369,33 @@ app.post('/api/auth/register', (req, res) => {
     return res.json({ success: true, user });
   } catch (err) {
     if (err.message && err.message.includes('UNIQUE')) {
-      if (err.message.includes('username')) {
-        return res.status(400).json({ error: 'That username is already taken. Please choose another.' });
-      }
-      return res.status(400).json({ error: 'Email already registered. Please log in.' });
+      return res.status(400).json({ error: 'This username/email is already registered.' });
     }
     return res.status(500).json({ error: err.message });
   }
+});
+
+// Check availability for real-time validation
+app.post('/api/auth/check-availability', (req, res) => {
+  const { username, email } = req.body;
+  const cleanUsername = username ? username.trim().toLowerCase() : null;
+  const cleanEmail = email ? email.trim().toLowerCase() : null;
+
+  if (cleanEmail) {
+    const user = db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(cleanEmail);
+    if (user) {
+      return res.json({ available: false, field: 'email', message: 'This username/email is already registered.' });
+    }
+  }
+
+  if (cleanUsername) {
+    const user = db.prepare('SELECT id FROM users WHERE LOWER(username) = ?').get(cleanUsername);
+    if (user) {
+      return res.json({ available: false, field: 'username', message: 'This username/email is already registered.' });
+    }
+  }
+
+  return res.json({ available: true });
 });
 
 // --- Authentication: Secure Login (Username OR Email + Password) ---

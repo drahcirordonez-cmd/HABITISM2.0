@@ -135,14 +135,18 @@ const Habitism = (() => {
         body: JSON.stringify({ name, username, email, password })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
+      if (!res.ok) {
+        const error = new Error(data.error || 'Registration failed');
+        error.field = data.field;
+        throw error;
+      }
       setCurrentUser(data.user);
       return data.user;
     } catch (err) {
-      console.warn('Backend unavailable, using isolated local registration:', err.message);
       if (err.message.includes('already registered') || err.message.includes('already taken')) {
         throw err;
       }
+      console.warn('Backend unavailable, using isolated local registration:', err.message);
       const user = {
         id: Date.now(),
         name,
@@ -864,6 +868,19 @@ const Habitism = (() => {
     }
   }
 
+  async function checkAvailability(username, email) {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/check-availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email })
+      });
+      return await res.json();
+    } catch (e) {
+      return { available: true };
+    }
+  }
+
   return {
     API_BASE,
     getCurrentUser,
@@ -874,6 +891,7 @@ const Habitism = (() => {
     requireAuth,
     logout,
     register,
+    checkAvailability,
     login,
     forgotPassword,
     FB_APP_ID,

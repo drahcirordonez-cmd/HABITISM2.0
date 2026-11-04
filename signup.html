@@ -44,7 +44,7 @@
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
       margin-bottom: 14px;
     }
 
@@ -74,6 +74,31 @@
       box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
     }
 
+    .form-group input.is-invalid {
+      border-color: #f87171 !important;
+      background: rgba(239, 68, 68, 0.09) !important;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25) !important;
+    }
+
+    .field-error {
+      color: #f87171;
+      font-size: 0.82rem;
+      font-weight: 500;
+      line-height: 1.35;
+      display: none;
+      margin-top: 3px;
+    }
+
+    .field-error.visible {
+      display: block;
+      animation: fieldErrorFade 0.2s ease-out;
+    }
+
+    @keyframes fieldErrorFade {
+      from { opacity: 0; transform: translateY(-3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .btn-submit {
       width: 100%;
       padding: 13px;
@@ -93,6 +118,12 @@
       transform: translateY(-2px);
       box-shadow: 0 6px 24px rgba(147, 51, 234, 0.65);
       filter: brightness(1.1);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
     }
 
     .auth-error {
@@ -137,30 +168,35 @@
       <span style="flex: 1; border-bottom: 1px solid rgba(255,255,255,0.12);"></span>
     </div>
 
-    <form id="signupForm" onsubmit="handleSignupSubmit(event)">
+    <form id="signupForm" novalidate onsubmit="handleSignupSubmit(event)">
       <div class="form-group">
-        <label>Full Name</label>
-        <input type="text" id="signupName" required placeholder="John Doe" autocomplete="name">
+        <label for="signupName">Full Name</label>
+        <input type="text" id="signupName" placeholder="e.g. John Doe" autocomplete="name">
+        <div class="field-error" id="nameError"></div>
       </div>
 
       <div class="form-group">
-        <label>Username</label>
-        <input type="text" id="signupUsername" required placeholder="johndoe" autocomplete="username">
+        <label for="signupUsername">Username</label>
+        <input type="text" id="signupUsername" placeholder="e.g. johndoe" autocomplete="username">
+        <div class="field-error" id="usernameError"></div>
       </div>
 
       <div class="form-group">
-        <label>Email Address</label>
-        <input type="email" id="signupEmail" required placeholder="john@example.com" autocomplete="email">
+        <label for="signupEmail">Email Address</label>
+        <input type="email" id="signupEmail" placeholder="john@example.com" autocomplete="email">
+        <div class="field-error" id="emailError"></div>
       </div>
 
       <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="signupPassword" required placeholder="At least 4 characters" minlength="4" autocomplete="new-password">
+        <label for="signupPassword">Password</label>
+        <input type="password" id="signupPassword" placeholder="Minimum 8 characters" autocomplete="new-password">
+        <div class="field-error" id="passwordError"></div>
       </div>
 
       <div class="form-group">
-        <label>Confirm Password</label>
-        <input type="password" id="signupConfirmPassword" required placeholder="Repeat password" minlength="4" autocomplete="new-password">
+        <label for="signupConfirmPassword">Confirm Password</label>
+        <input type="password" id="signupConfirmPassword" placeholder="Re-enter password" autocomplete="new-password">
+        <div class="field-error" id="confirmPasswordError"></div>
       </div>
 
       <button type="submit" class="btn-submit" id="btnSignupText">Create My Account & Continue →</button>
@@ -172,23 +208,277 @@
     </div>
   </div>
 
-  <script src="app.js?v=2.2"></script>
+  <script src="app.js?v=2.4"></script>
   <script>
+    // -------------------------------------------------------------
+    // Inline Field Validation Helpers
+    // -------------------------------------------------------------
+    function setFieldError(fieldId, errorId, errorMsg) {
+      const input = document.getElementById(fieldId);
+      const err = document.getElementById(errorId);
+      if (!input || !err) return;
+      if (errorMsg) {
+        input.classList.add("is-invalid");
+        err.innerText = errorMsg;
+        err.classList.add("visible");
+      } else {
+        input.classList.remove("is-invalid");
+        err.innerText = "";
+        err.classList.remove("visible");
+      }
+    }
+
+    // Name field validation:
+    // - Allowed: letters (a-z, A-Z), spaces, hyphens, apostrophes, periods.
+    // - Blocked: numbers, special characters (@#$% etc.).
+    // - Error: "Name cannot contain numbers or special characters."
+    function validateName(value) {
+      const name = (value || '').trim();
+      if (!name) {
+        return "Name is required.";
+      }
+      const allowedRegex = /^[a-zA-Z\s\-'.]+$/;
+      if (!allowedRegex.test(name) || !/[a-zA-Z]/.test(name)) {
+        return "Name cannot contain numbers or special characters.";
+      }
+      return "";
+    }
+
+    // Username validation
+    function validateUsername(value) {
+      const username = (value || '').trim();
+      if (!username) {
+        return "Username is required.";
+      }
+      if (username.length < 3) {
+        return "Username must be at least 3 characters.";
+      }
+      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        return "Username can only contain letters, numbers, underscores, and hyphens.";
+      }
+      return "";
+    }
+
+    // Email field validation:
+    // - Must contain one @.
+    // - Local part: letters, numbers, dots, underscores, hyphens.
+    // - Domain: must contain at least one dot and a TLD of 2+ letters (.com, .org, etc.).
+    // - Reject consecutive dots, leading/trailing dots, spaces.
+    // - Errors: specify exactly what's missing.
+    function validateEmail(value) {
+      const raw = value || '';
+      if (!raw.trim()) {
+        return "Email address is required.";
+      }
+      if (/\s/.test(raw)) {
+        return "Email cannot contain spaces.";
+      }
+      const email = raw.trim();
+
+      const atMatches = email.match(/@/g);
+      if (!atMatches || atMatches.length === 0) {
+        return "Email must contain an '@' symbol.";
+      }
+      if (atMatches.length > 1) {
+        return "Email can only contain one '@' symbol.";
+      }
+
+      if (email.includes('..')) {
+        return "Email cannot contain consecutive dots.";
+      }
+
+      const atIndex = email.indexOf('@');
+      const localPart = email.slice(0, atIndex);
+      const domain = email.slice(atIndex + 1);
+
+      if (!localPart) {
+        return "Email is missing a username before '@'.";
+      }
+      if (!domain) {
+        return "Email is missing a domain after '@' (e.g., example.com).";
+      }
+
+      if (localPart.startsWith('.') || localPart.endsWith('.')) {
+        return "Email username cannot start or end with a dot.";
+      }
+
+      if (!/^[a-zA-Z0-9._-]+$/.test(localPart)) {
+        return "Email username can only contain letters, numbers, dots, underscores, and hyphens.";
+      }
+
+      if (domain.startsWith('.') || domain.endsWith('.')) {
+        return "Email domain cannot start or end with a dot.";
+      }
+
+      if (!domain.includes('.')) {
+        return "Email domain must contain at least one dot (e.g., example.com).";
+      }
+
+      const domainParts = domain.split('.');
+      const tld = domainParts[domainParts.length - 1];
+
+      for (let i = 0; i < domainParts.length - 1; i++) {
+        const part = domainParts[i];
+        if (!part) {
+          return "Email domain contains an empty segment.";
+        }
+        if (!/^[a-zA-Z0-9-]+$/.test(part)) {
+          return "Email domain contains invalid characters.";
+        }
+        if (part.startsWith('-') || part.endsWith('-')) {
+          return "Email domain segments cannot start or end with a hyphen.";
+        }
+      }
+
+      if (!/^[a-zA-Z]{2,}$/.test(tld)) {
+        return "Email must include a valid top-level domain like .com";
+      }
+
+      return "";
+    }
+
+    // Password validation: Minimum 8 characters
+    function validatePassword(value) {
+      const password = value || '';
+      if (!password) {
+        return "Password is required.";
+      }
+      if (password.length < 8) {
+        return "Password must be at least 8 characters.";
+      }
+      return "";
+    }
+
+    // Confirm Password validation: Must match password
+    function validateConfirmPassword(confirmVal, passwordVal) {
+      const confirm = confirmVal || '';
+      if (!confirm) {
+        return "Please confirm your password.";
+      }
+      if (confirm !== passwordVal) {
+        return "Passwords do not match.";
+      }
+      return "";
+    }
+
+    // -------------------------------------------------------------
+    // Attach Blur and Input Listeners
+    // -------------------------------------------------------------
+    document.addEventListener("DOMContentLoaded", () => {
+      const nameInput = document.getElementById("signupName");
+      const usernameInput = document.getElementById("signupUsername");
+      const emailInput = document.getElementById("signupEmail");
+      const passwordInput = document.getElementById("signupPassword");
+      const confirmInput = document.getElementById("signupConfirmPassword");
+
+      // Name events
+      nameInput.addEventListener("blur", () => {
+        setFieldError("signupName", "nameError", validateName(nameInput.value));
+      });
+      nameInput.addEventListener("input", () => {
+        if (nameInput.classList.contains("is-invalid")) {
+          setFieldError("signupName", "nameError", validateName(nameInput.value));
+        }
+      });
+
+      // Username events
+      usernameInput.addEventListener("blur", async () => {
+        const err = validateUsername(usernameInput.value);
+        setFieldError("signupUsername", "usernameError", err);
+        if (!err && typeof Habitism !== 'undefined' && Habitism.checkAvailability) {
+          const res = await Habitism.checkAvailability(usernameInput.value.trim(), null);
+          if (res && !res.available && res.field === 'username') {
+            setFieldError("signupUsername", "usernameError", "This username/email is already registered.");
+          }
+        }
+      });
+      usernameInput.addEventListener("input", () => {
+        if (usernameInput.classList.contains("is-invalid")) {
+          setFieldError("signupUsername", "usernameError", validateUsername(usernameInput.value));
+        }
+      });
+
+      // Email events
+      emailInput.addEventListener("blur", async () => {
+        const err = validateEmail(emailInput.value);
+        setFieldError("signupEmail", "emailError", err);
+        if (!err && typeof Habitism !== 'undefined' && Habitism.checkAvailability) {
+          const res = await Habitism.checkAvailability(null, emailInput.value.trim());
+          if (res && !res.available && res.field === 'email') {
+            setFieldError("signupEmail", "emailError", "This username/email is already registered.");
+          }
+        }
+      });
+      emailInput.addEventListener("input", () => {
+        if (emailInput.classList.contains("is-invalid")) {
+          setFieldError("signupEmail", "emailError", validateEmail(emailInput.value));
+        }
+      });
+
+      // Password events
+      passwordInput.addEventListener("blur", () => {
+        setFieldError("signupPassword", "passwordError", validatePassword(passwordInput.value));
+        if (confirmInput.value) {
+          setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
+        }
+      });
+      passwordInput.addEventListener("input", () => {
+        if (passwordInput.classList.contains("is-invalid")) {
+          setFieldError("signupPassword", "passwordError", validatePassword(passwordInput.value));
+        }
+        if (confirmInput.value && confirmInput.classList.contains("is-invalid")) {
+          setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
+        }
+      });
+
+      // Confirm Password events
+      confirmInput.addEventListener("blur", () => {
+        setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
+      });
+      confirmInput.addEventListener("input", () => {
+        if (confirmInput.classList.contains("is-invalid")) {
+          setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
+        }
+      });
+    });
+
+    // -------------------------------------------------------------
+    // Form Submission Handler
+    // -------------------------------------------------------------
     async function handleSignupSubmit(e) {
       e.preventDefault();
-      const name = document.getElementById("signupName").value.trim();
-      const username = document.getElementById("signupUsername").value.trim();
-      const email = document.getElementById("signupEmail").value.trim();
-      const password = document.getElementById("signupPassword").value;
-      const confirmPassword = document.getElementById("signupConfirmPassword").value;
-      const errorEl = document.getElementById("signupError");
+
+      const nameInput = document.getElementById("signupName");
+      const usernameInput = document.getElementById("signupUsername");
+      const emailInput = document.getElementById("signupEmail");
+      const passwordInput = document.getElementById("signupPassword");
+      const confirmInput = document.getElementById("signupConfirmPassword");
+      const topErrorEl = document.getElementById("signupError");
       const btn = document.getElementById("btnSignupText");
 
-      errorEl.style.display = "none";
+      topErrorEl.style.display = "none";
+      topErrorEl.innerText = "";
 
-      if (password !== confirmPassword) {
-        errorEl.innerText = "Passwords do not match. Please re-enter.";
-        errorEl.style.display = "block";
+      // Validate all fields
+      const nameErr = validateName(nameInput.value);
+      const usernameErr = validateUsername(usernameInput.value);
+      const emailErr = validateEmail(emailInput.value);
+      const passwordErr = validatePassword(passwordInput.value);
+      const confirmErr = validateConfirmPassword(confirmInput.value, passwordInput.value);
+
+      setFieldError("signupName", "nameError", nameErr);
+      setFieldError("signupUsername", "usernameError", usernameErr);
+      setFieldError("signupEmail", "emailError", emailErr);
+      setFieldError("signupPassword", "passwordError", passwordErr);
+      setFieldError("signupConfirmPassword", "confirmPasswordError", confirmErr);
+
+      // Block account creation if any field is invalid
+      if (nameErr || usernameErr || emailErr || passwordErr || confirmErr) {
+        if (nameErr) nameInput.focus();
+        else if (usernameErr) usernameInput.focus();
+        else if (emailErr) emailInput.focus();
+        else if (passwordErr) passwordInput.focus();
+        else if (confirmErr) confirmInput.focus();
         return;
       }
 
@@ -196,14 +486,41 @@
       btn.innerText = "Creating Account...";
 
       try {
-        const user = await Habitism.register(name, username, email, password);
-        // Successful registration -> proceed to Rules Commitment Contract
-        window.location.href = "rules.html";
+        const user = await Habitism.register(
+          nameInput.value.trim(),
+          usernameInput.value.trim(),
+          emailInput.value.trim(),
+          passwordInput.value
+        );
+        // On success, redirect to /rules.html
+        window.location.href = "/rules.html";
       } catch (err) {
-        errorEl.innerText = err.message || "Registration failed. Please try again.";
-        errorEl.style.display = "block";
         btn.disabled = false;
         btn.innerText = "Create My Account & Continue →";
+
+        const errMsg = err.message || "Registration failed. Please try again.";
+        if (errMsg.includes("already registered") || errMsg.includes("already taken")) {
+          const isEmail = (err.field === 'email') || errMsg.toLowerCase().includes('email');
+          const isUser = (err.field === 'username') || errMsg.toLowerCase().includes('username');
+
+          const conflictMsg = "This username/email is already registered.";
+          if (isEmail && !isUser) {
+            setFieldError("signupEmail", "emailError", conflictMsg);
+            emailInput.focus();
+          } else if (isUser && !isEmail) {
+            setFieldError("signupUsername", "usernameError", conflictMsg);
+            usernameInput.focus();
+          } else {
+            setFieldError("signupEmail", "emailError", conflictMsg);
+            setFieldError("signupUsername", "usernameError", conflictMsg);
+            emailInput.focus();
+          }
+          topErrorEl.innerText = conflictMsg;
+          topErrorEl.style.display = "block";
+        } else {
+          topErrorEl.innerText = errMsg;
+          topErrorEl.style.display = "block";
+        }
       }
     }
 
@@ -262,4 +579,3 @@
   </script>
 </body>
 </html>
-
