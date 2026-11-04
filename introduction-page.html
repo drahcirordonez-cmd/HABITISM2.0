@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HABITISM • The Habit Tracker with Real Consequences</title>
   <link rel="stylesheet" href="app.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#9333ea">
   <style>
     /* Reset and force full-width vertical column layout */
     html, body {
@@ -304,6 +306,20 @@
         Habitism.initFacebookSDK();
       }
     });
+  </script>
+  <script>
+    // Service Worker Registration for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            console.log('[Habitism PWA] Service Worker registered:', registration.scope);
+          })
+          .catch((error) => {
+            console.log('[Habitism PWA] Service Worker registration failed:', error);
+          });
+      });
+    }
   </script>
 </body>
 </html>
