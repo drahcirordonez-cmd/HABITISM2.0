@@ -168,6 +168,8 @@ function renderUsersTable(users) {
                 🗑️
               </button>
             ` : ''}
+          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="adminUnlockChecks(${u.id}, '${escapeHtml(u.username)}')" title="Unlock checkboxes locked by piggybank claim">🔓 Unlock</button>
+          <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="adminResetChecks(${u.id}, '${escapeHtml(u.username)}')" title="Uncheck all habit checkboxes & reset checklist progress to 0%">🔄 Reset Checks</button>
           <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustFreeze(${u.id})">❄️ Freeze</button>
           <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustCoins(${u.id})">🪙 Coins</button>
           <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="quickAdjustStreak(${u.id})">🔥 Streak</button>
@@ -184,10 +186,12 @@ function renderUsersTable(users) {
 // ==========================================================================
 async function inspectUser(userId) {
   try {
+    currentInspectUserId = userId;
     const res = await Habitism.adminGetUserDetails(userId);
     if (!res.success) throw new Error(res.error || 'Failed to inspect user');
 
     const { user, dailyLogs, accountabilityLogs, taskStates } = res;
+    currentInspectUsername = user.username || user.name || String(userId);
 
     // Set inspection modal headers
     document.getElementById('inspectUserName').innerText = `${user.name || user.username} (@${user.username})`;
@@ -224,20 +228,30 @@ async function inspectUser(userId) {
       taskList = statesMap[`tasks_lvl_${activeLevel}`] || getDefaultLevelTasks(activeLevel);
     }
 
-    // Check states
-    const checks = statesMap[`checks_lvl_${activeLevel}`] || statesMap['custom_checks'] || {};
+    // Check states & claim locks
+    const todayStr = new Date().toISOString().split('T')[0];
+    const checks = 
+      statesMap[`checks_${activeLevel}_${todayStr}`] ||
+      statesMap[`custom_checks_${todayStr}`] ||
+      statesMap[`checks_lvl_${activeLevel}`] || 
+      statesMap['custom_checks'] || 
+      {};
+
+    const lock = statesMap[`claim_lock_${todayStr}`] || {};
+    const lockedIdx = (taskMode === 'custom' ? lock['custom'] : lock[String(activeLevel)]) || {};
 
     const tasksContainer = document.getElementById('inspectTasksContainer');
     tasksContainer.innerHTML = taskList.map((t, idx) => {
-      const isChecked = !!checks[t.id || idx];
+      const isChecked = !!checks[t.id !== undefined ? t.id : idx] || !!checks[idx];
+      const isLocked = isChecked && !!lockedIdx[idx];
       return `
         <div class="task-inspect-item ${isChecked ? 'done' : ''}">
           <div class="task-inspect-title">
             <span>${isChecked ? '✅' : '⏳'}</span>
             <span>${t.icon || '📌'} ${escapeHtml(t.text || t.name || 'Habit Task')}</span>
           </div>
-          <span style="font-size: 0.78rem; font-weight: 700; color: ${isChecked ? '#34d399' : '#94a3b8'};">
-            ${isChecked ? 'Completed Today' : 'Pending'}
+          <span style="font-size: 0.78rem; font-weight: 700; color: ${isLocked ? '#f59e0b' : (isChecked ? '#34d399' : '#94a3b8')};">
+            ${isLocked ? '🔒 Claim Locked' : (isChecked ? 'Completed Today' : 'Pending')}
           </span>
         </div>
       `;
@@ -630,4 +644,65 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+
+// ==========================================================================
+// Admin Actions: Unlock Checks & Reset Checklist
+// ==========================================================================
+let currentInspectUserId = null;
+let currentInspectUsername = null;
+
+async function inspectActionUnlock() {
+  if (!currentInspectUserId) return;
+  await adminUnlockChecks(currentInspectUserId, currentInspectUsername);
+}
+
+async function inspectActionResetChecks() {
+  if (!currentInspectUserId) return;
+  await adminResetChecks(currentInspectUserId, currentInspectUsername);
+}
+
+async function adminUnlockChecks(userId, username) {
+  const name = username || `User #${userId}`;
+  if (!confirm(`Remove locked checks for @${name} (ID #${userId})?\n\nThis will remove the coin claim lock on today's checkboxes, allowing the user to uncheck or toggle habits immediately without waiting for midnight.`)) {
+    return;
+  }
+
+  try {
+    const res = await Habitism.adminUnlockChecks(userId);
+    if (res.success) {
+      alert(res.message || `Locked checks removed for @${name}.`);
+      loadAdminData();
+      if (currentInspectUserId === userId && document.getElementById('inspectModal').style.display === 'flex') {
+        inspectUser(userId);
+      }
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error unlocking checks: ' + err.message);
+  }
+}
+
+async function adminResetChecks(userId, username) {
+  const name = username || `User #${userId}`;
+  if (!confirm(`Reset checklist progress for @${name} (ID #${userId})?\n\n⚠️ This will remove ALL checkmarks on their checkboxes, clear claim locks, and reset today's checklist progress back to 0%.`)) {
+    return;
+  }
+
+  try {
+    const res = await Habitism.adminResetChecks(userId);
+    if (res.success) {
+      alert(res.message || `Checklist progress reset for @${name}.`);
+      loadAdminData();
+      if (currentInspectUserId === userId && document.getElementById('inspectModal').style.display === 'flex') {
+        inspectUser(userId);
+      }
+    } else {
+      alert('Failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error resetting checklist: ' + err.message);
+  }
 }

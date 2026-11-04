@@ -216,6 +216,19 @@
       </div>
 
       <div class="admin-modal-body">
+        <!-- Admin Quick Action Toolbar for This User -->
+        <div style="display: flex; gap: 8px; margin-bottom: 1.2rem; flex-wrap: wrap; background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); align-items: center;">
+          <span style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1; margin-right: 4px;">⚡ Checklist Controls:</span>
+          <button type="button" class="admin-btn admin-btn-secondary" id="inspectBtnUnlock" onclick="inspectActionUnlock()" style="padding: 5px 12px; font-size: 0.8rem;" title="Remove coin claim padlock so habits can be unchecked">
+            <span>🔓</span>
+            <span>Remove Locked Checks</span>
+          </button>
+          <button type="button" class="admin-btn admin-btn-danger" id="inspectBtnResetChecks" onclick="inspectActionResetChecks()" style="padding: 5px 12px; font-size: 0.8rem;" title="Uncheck all habit checkboxes and reset checklist progress to 0%">
+            <span>🔄</span>
+            <span>Reset Checklist Progress (Uncheck All)</span>
+          </button>
+        </div>
+
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <span style="font-size: 0.84rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Active Routine</span>
           <span id="inspectUserMode" style="font-size: 0.82rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.14); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.3);">
@@ -274,8 +287,8 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
-  <script src="admin.js"></script>
+  <script src="app.js?v=2.3"></script>
+  <script src="admin.js?v=2.3"></script>
   <script>
     // Service Worker Registration for PWA
     if ('serviceWorker' in navigator) {

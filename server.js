@@ -767,9 +767,10 @@ app.get('/api/admin/users', (req, res) => {
   `).all();
 
   // Attach today's completion count for each user
-  const today = new Date().toDateString();
+  const todayIso = new Date().toISOString().split('T')[0];
+  const todayDateStr = new Date().toDateString();
   const enrichedUsers = users.map(u => {
-    const todayLog = db.prepare('SELECT completed_count, total_count, status FROM daily_logs WHERE user_id = ? AND date_str = ?').get(u.id, today);
+    const todayLog = db.prepare('SELECT completed_count, total_count, status FROM daily_logs WHERE user_id = ? AND (date_str = ? OR date_str = ?)').get(u.id, todayIso, todayDateStr);
     return {
       ...u,
       todayCompleted: todayLog ? todayLog.completed_count : 0,
@@ -999,6 +1000,121 @@ app.post('/api/admin/users/:targetUserId/calendar', (req, res) => {
     totalCount: totalCount || 0,
     status: status || 'in_progress',
     message: `Calendar updated for ${user.username} on ${dateStr}.`
+  });
+});
+
+// ============================================================================
+// ADMIN: Unlock user's claimed habit checkboxes (removes coin claim padlock)
+// ============================================================================
+app.post('/api/admin/users/:targetUserId/unlock-checks', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const targetId = req.params.targetUserId;
+  const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(targetId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // 1. Reset all historical and current claim locks for this user to empty object
+  db.prepare(`
+    UPDATE user_task_states
+    SET state_value = '{}', updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ? AND state_key LIKE 'claim_lock_%'
+  `).run(targetId);
+
+  // 2. Explicitly ensure today's claim lock is saved as empty object
+  db.prepare(`
+    INSERT INTO user_task_states (user_id, state_key, state_value, updated_at)
+    VALUES (?, ?, '{}', CURRENT_TIMESTAMP)
+    ON CONFLICT(user_id, state_key) DO UPDATE SET
+      state_value = '{}',
+      updated_at = CURRENT_TIMESTAMP
+  `).run(targetId, `claim_lock_${today}`);
+
+  console.log(`👑 Admin ${adminId} removed locked checks for user ${user.username} (ID #${targetId})`);
+
+  return res.json({
+    success: true,
+    userId: targetId,
+    username: user.username,
+    message: `Locked checks removed for @${user.username}. All habit checkboxes are now unlocked.`
+  });
+});
+
+// ============================================================================
+// ADMIN: Remove checks on user's checkboxes (resets checklist progress to 0%)
+// ============================================================================
+app.post('/api/admin/users/:targetUserId/reset-checks', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const targetId = req.params.targetUserId;
+  const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(targetId);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  const today = new Date().toISOString().split('T')[0];
+  const todayDateStr = new Date().toDateString();
+
+  // 1. Reset all existing check states
+  db.prepare(`
+    UPDATE user_task_states
+    SET state_value = '{}', updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ? AND (state_key LIKE 'checks_%' OR state_key LIKE 'custom_checks%')
+  `).run(targetId);
+
+  // 2. Ensure today's specific level check keys (1-5) and custom check key are explicitly set to '{}'
+  for (let lvl = 1; lvl <= 5; lvl++) {
+    db.prepare(`
+      INSERT INTO user_task_states (user_id, state_key, state_value, updated_at)
+      VALUES (?, ?, '{}', CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id, state_key) DO UPDATE SET
+        state_value = '{}',
+        updated_at = CURRENT_TIMESTAMP
+    `).run(targetId, `checks_${lvl}_${today}`);
+  }
+
+  db.prepare(`
+    INSERT INTO user_task_states (user_id, state_key, state_value, updated_at)
+    VALUES (?, ?, '{}', CURRENT_TIMESTAMP)
+    ON CONFLICT(user_id, state_key) DO UPDATE SET
+      state_value = '{}',
+      updated_at = CURRENT_TIMESTAMP
+  `).run(targetId, `custom_checks_${today}`);
+
+  // 3. Reset lock states as well
+  db.prepare(`
+    UPDATE user_task_states
+    SET state_value = '{}', updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ? AND state_key LIKE 'claim_lock_%'
+  `).run(targetId);
+
+  db.prepare(`
+    INSERT INTO user_task_states (user_id, state_key, state_value, updated_at)
+    VALUES (?, ?, '{}', CURRENT_TIMESTAMP)
+    ON CONFLICT(user_id, state_key) DO UPDATE SET
+      state_value = '{}',
+      updated_at = CURRENT_TIMESTAMP
+  `).run(targetId, `claim_lock_${today}`);
+
+  // 4. Reset today's calendar completion in daily_logs
+  db.prepare(`
+    UPDATE daily_logs
+    SET completed_count = 0, status = 'empty'
+    WHERE user_id = ? AND (date_str = ? OR date_str = ?)
+  `).run(targetId, today, todayDateStr);
+
+  console.log(`👑 Admin ${adminId} reset checklist progress for user ${user.username} (ID #${targetId})`);
+
+  return res.json({
+    success: true,
+    userId: targetId,
+    username: user.username,
+    message: `Checklist progress reset for @${user.username}. All habit checkboxes cleared and unlocked.`
   });
 });
 

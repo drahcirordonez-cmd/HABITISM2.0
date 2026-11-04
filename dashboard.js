@@ -1373,6 +1373,11 @@ async function syncUserDataFromServer() {
           localStorage.removeItem(k);
         }
       });
+      // Clear today's calendar tier if count is reset to 0 or deleted
+      const todayK = userKey("cal_tier_" + getTodayString());
+      if (!data.calendarMap[getTodayString()] || data.calendarMap[getTodayString()] === 0) {
+        localStorage.removeItem(todayK);
+      }
     }
 
     // 3. Restore Task States (Level, Mode, Custom Tasks, All Checks, Commitments)
@@ -1570,9 +1575,15 @@ function handleDayRollover() {
 
 setInterval(handleDayRollover, 15000);
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) handleDayRollover();
+  if (!document.hidden) {
+    handleDayRollover();
+    syncUserDataFromServer();
+  }
 });
-window.addEventListener("focus", handleDayRollover);
+window.addEventListener("focus", () => {
+  handleDayRollover();
+  syncUserDataFromServer();
+});
 
 // -------------------------------------------------------------
 // 🚀 INITIALIZATION

@@ -798,6 +798,56 @@ const Habitism = (() => {
     }
   }
 
+  async function adminUnlockChecks(targetUserId) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
+
+    try {
+      const res = await fetchJson(`${API_BASE}/api/admin/users/${targetUserId}/unlock-checks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id }
+      });
+      const today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(`u_${targetUserId}_claim_lock_${today}`, '{}');
+      return res;
+    } catch (err) {
+      console.warn('Backend unavailable, unlocking checks locally:', err.message);
+      const today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(`u_${targetUserId}_claim_lock_${today}`, '{}');
+      return { success: true, message: `Locked checks removed for user #${targetUserId} (simulated mode).` };
+    }
+  }
+
+  async function adminResetChecks(targetUserId) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
+
+    try {
+      const res = await fetchJson(`${API_BASE}/api/admin/users/${targetUserId}/reset-checks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id }
+      });
+      const today = new Date().toISOString().split('T')[0];
+      for (let i = 1; i <= 5; i++) {
+        localStorage.setItem(`u_${targetUserId}_checks_${i}_${today}`, '{}');
+      }
+      localStorage.setItem(`u_${targetUserId}_custom_checks_${today}`, '{}');
+      localStorage.setItem(`u_${targetUserId}_claim_lock_${today}`, '{}');
+      localStorage.removeItem(`u_${targetUserId}_cal_tier_${today}`);
+      return res;
+    } catch (err) {
+      console.warn('Backend unavailable, resetting checks locally:', err.message);
+      const today = new Date().toISOString().split('T')[0];
+      for (let i = 1; i <= 5; i++) {
+        localStorage.setItem(`u_${targetUserId}_checks_${i}_${today}`, '{}');
+      }
+      localStorage.setItem(`u_${targetUserId}_custom_checks_${today}`, '{}');
+      localStorage.setItem(`u_${targetUserId}_claim_lock_${today}`, '{}');
+      localStorage.removeItem(`u_${targetUserId}_cal_tier_${today}`);
+      return { success: true, message: `Checklist progress reset for user #${targetUserId} (simulated mode).` };
+    }
+  }
+
   async function adminStreakFreeze(targetUserId, amount) {
     const user = getCurrentUser();
     if (!user || user.role !== 'admin') throw new Error('Unauthorized');
@@ -844,6 +894,8 @@ const Habitism = (() => {
     adminDeleteUser,
     adminGetAccountabilityFeed,
     adminStreakFreeze,
+    adminUnlockChecks,
+    adminResetChecks,
     adminCoins,
     adminStreak,
     adminCalendar,
