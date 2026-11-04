@@ -97,6 +97,17 @@ db.exec(`
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, state_key)
   );
+
+  CREATE TABLE IF NOT EXISTS password_change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    username TEXT NOT NULL,
+    account_creation_date TEXT,
+    last_password TEXT,
+    new_password TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Safe column migrations in case existing habitism.db lacks columns
@@ -509,24 +520,100 @@ app.post('/api/auth/login', (req, res) => {
   return res.json({ success: true, user });
 });
 
-// --- Authentication: Forgot / Reset Password Workflow ---
+// --- Authentication: Forgot / Reset Password Workflow (Admin Review Flow) ---
 app.post('/api/auth/forgot-password', (req, res) => {
-  const { identifier, newPassword } = req.body;
-  const loginId = (identifier || '').trim().toLowerCase();
+  const {
+    creationDate,
+    accountCreationDate,
+    account_creation_date,
+    lastPassword,
+    last_password,
+    newPassword,
+    new_password,
+    desiredNewPassword,
+    desired_new_password,
+    username,
+    identifier
+  } = req.body || {};
 
-  if (!loginId || !newPassword || newPassword.length < 4) {
-    return res.status(400).json({ error: 'Valid username/email and a new password (min 4 chars) are required.' });
+  const cleanCreationDate = (creationDate || accountCreationDate || account_creation_date || '').trim();
+  const cleanLastPassword = (lastPassword || last_password || '').trim();
+  const cleanNewPassword = (newPassword || new_password || desiredNewPassword || desired_new_password || '').trim();
+
+  // 1. Validate Account Creation Date
+  if (!cleanCreationDate) {
+    return res.status(400).json({ error: 'Account creation date is required.', field: 'creationDate' });
+  }
+  const parsedDate = new Date(cleanCreationDate);
+  if (isNaN(parsedDate.getTime())) {
+    return res.status(400).json({ error: 'Please enter a valid account creation date.', field: 'creationDate' });
+  }
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (parsedDate > today) {
+    return res.status(400).json({ error: 'Account creation date cannot be in the future.', field: 'creationDate' });
   }
 
-  const user = db.prepare('SELECT id, name, username, email FROM users WHERE LOWER(username) = ? OR LOWER(email) = ?').get(loginId, loginId);
+  // 2. Validate Last Remembered Password
+  if (!cleanLastPassword) {
+    return res.status(400).json({ error: 'Last remembered password is required.', field: 'lastPassword' });
+  }
+
+  // 3. Validate Desired New Password (min 8 chars)
+  if (!cleanNewPassword) {
+    return res.status(400).json({ error: 'Desired new password is required.', field: 'newPassword' });
+  }
+  if (cleanNewPassword.length < 8) {
+    return res.status(400).json({ error: 'Desired new password must be at least 8 characters.', field: 'newPassword' });
+  }
+
+  // 4. Verify account exists in database matching creation date and last remembered password
+  let user;
+  const cleanUser = (username || identifier || '').trim().toLowerCase();
+  if (cleanUser) {
+    user = db.prepare(`
+      SELECT id, name, username, email, password, created_at 
+      FROM users 
+      WHERE (LOWER(username) = ? OR LOWER(email) = ?) 
+        AND DATE(created_at) = DATE(?) 
+        AND password = ?
+    `).get(cleanUser, cleanUser, cleanCreationDate, cleanLastPassword);
+  } else {
+    user = db.prepare(`
+      SELECT id, name, username, email, password, created_at 
+      FROM users 
+      WHERE DATE(created_at) = DATE(?) AND password = ?
+    `).get(cleanCreationDate, cleanLastPassword);
+  }
+
   if (!user) {
-    return res.status(404).json({ error: 'No account found with that username or email.' });
+    return res.status(400).json({
+      error: 'No account found matching this creation date and last remembered password.',
+      field: 'lastPassword'
+    });
   }
 
-  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(newPassword, user.id);
-  console.log(`🔑 Password reset for user: ${user.username} (${user.email})`);
+  const targetUsername = user.username || user.name || user.email;
 
-  return res.json({ success: true, message: `Password for ${user.username} has been reset successfully! You can now log in.` });
+  // 5. Insert row into password_change_requests table with status 'pending'
+  try {
+    const insert = db.prepare(`
+      INSERT INTO password_change_requests (user_id, username, account_creation_date, last_password, new_password, status, created_at)
+      VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+    `);
+    const result = insert.run(user.id, targetUsername, cleanCreationDate, cleanLastPassword, cleanNewPassword);
+
+    console.log(`📩 Password change request #${result.lastInsertRowid} logged for user @${targetUsername}`);
+
+    return res.json({
+      success: true,
+      requestId: result.lastInsertRowid,
+      message: "Your request is under review. Please allow up to 72 hours. Keep an eye on the Habitism Webpage so you'll be updated regarding password change request."
+    });
+  } catch (err) {
+    console.error('Error recording password change request:', err.message);
+    return res.status(500).json({ error: 'Failed to record password change request.' });
+  }
 });
 
 // --- Authentication: Facebook OAuth Linking / Login ---
@@ -941,7 +1028,7 @@ app.get('/api/admin/users', (req, res) => {
   return res.json({ success: true, users: enrichedUsers });
 });
 
-// Inspect a specific user's habit to-do list and logs
+// Inspect a specific user's habit to-do list and logs (includes plaintext password & creation date for admin)
 app.get('/api/admin/user-details/:targetUserId', (req, res) => {
   const adminId = req.headers['x-admin-id'] || req.query.adminId;
   if (!verifyAdmin(adminId)) {
@@ -949,7 +1036,7 @@ app.get('/api/admin/user-details/:targetUserId', (req, res) => {
   }
 
   const targetId = req.params.targetUserId;
-  const targetUser = db.prepare('SELECT id, name, username, email, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name, created_at FROM users WHERE id = ?').get(targetId);
+  const targetUser = db.prepare('SELECT id, name, username, email, password, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name, created_at FROM users WHERE id = ?').get(targetId);
   if (!targetUser) return res.status(404).json({ error: 'User not found.' });
 
   // Get daily logs
@@ -967,6 +1054,92 @@ app.get('/api/admin/user-details/:targetUserId', (req, res) => {
     dailyLogs,
     accountabilityLogs,
     taskStates
+  });
+});
+
+// ============================================================================
+// ADMIN: Password Change Requests Management
+// ============================================================================
+
+// 1. Get all pending password change requests (Admin only)
+app.get('/api/admin/password-requests', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const requests = db.prepare(`
+    SELECT id, user_id, username, account_creation_date, last_password, new_password, status, created_at
+    FROM password_change_requests
+    WHERE status = 'pending'
+    ORDER BY id DESC
+  `).all();
+
+  return res.json({ success: true, requests });
+});
+
+// 2. Approve a password change request (Admin only)
+app.post('/api/admin/password-requests/:id/approve', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const requestId = req.params.id;
+  const request = db.prepare('SELECT * FROM password_change_requests WHERE id = ?').get(requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Password change request not found.' });
+  }
+  if (request.status !== 'pending') {
+    return res.status(400).json({ error: `Request has already been ${request.status}.` });
+  }
+
+  // Update target user's password in users table (plaintext per security note)
+  if (request.user_id) {
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(request.new_password, request.user_id);
+  } else {
+    db.prepare('UPDATE users SET password = ? WHERE LOWER(username) = LOWER(?)').run(request.new_password, request.username);
+  }
+
+  // Update request status to 'approved'
+  db.prepare(`UPDATE password_change_requests SET status = 'approved' WHERE id = ?`).run(requestId);
+
+  console.log(`👑 Admin #${adminId} approved password change request #${requestId} for @${request.username}`);
+
+  return res.json({
+    success: true,
+    message: `Password change request approved. Password for @${request.username} has been updated.`,
+    requestId: request.id,
+    targetUsername: request.username
+  });
+});
+
+// 3. Reject a password change request (Admin only)
+app.post('/api/admin/password-requests/:id/reject', (req, res) => {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const requestId = req.params.id;
+  const request = db.prepare('SELECT * FROM password_change_requests WHERE id = ?').get(requestId);
+  if (!request) {
+    return res.status(404).json({ error: 'Password change request not found.' });
+  }
+  if (request.status !== 'pending') {
+    return res.status(400).json({ error: `Request has already been ${request.status}.` });
+  }
+
+  // Update request status to 'rejected'
+  db.prepare(`UPDATE password_change_requests SET status = 'rejected' WHERE id = ?`).run(requestId);
+
+  console.log(`👑 Admin #${adminId} rejected password change request #${requestId} for @${request.username}`);
+
+  return res.json({
+    success: true,
+    message: `Password change request for @${request.username} has been rejected.`,
+    requestId: request.id,
+    targetUsername: request.username
   });
 });
 
@@ -1590,3 +1763,5 @@ app.listen(PORT, () => {
   console.log(`📘 Facebook Page configured: ${FB_CONFIG.pageName} (ID: ${FB_CONFIG.pageId})`);
   console.log(`👑 Admin pre-seed: admin / admin123 | 👤 User pre-seed: user / user123`);
 });
+
+module.exports = app;

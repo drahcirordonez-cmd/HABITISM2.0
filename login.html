@@ -148,6 +148,34 @@
       filter: brightness(1.1);
     }
 
+    .forgot-password-link {
+      font-size: 0.8rem;
+      color: #c084fc;
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 7px;
+      background: rgba(168, 85, 247, 0.12);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      transition: all 0.22s ease;
+      cursor: pointer;
+    }
+
+    .forgot-password-link:hover {
+      color: #ffffff;
+      background: rgba(168, 85, 247, 0.28);
+      border-color: #c084fc;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(168, 85, 247, 0.35);
+    }
+
+    .forgot-password-link:active {
+      transform: translateY(0);
+    }
+
     
     /* Role selection & demo chips */
     .role-selector-bar {
@@ -349,9 +377,12 @@
         </div>
 
         <div class="form-group">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
             <label for="authPassword">Password</label>
-            <a href="javascript:void(0)" onclick="openForgotModal()" style="font-size: 0.8rem; color: #a855f7; text-decoration: none; font-weight: 600;">Forgot Password?</a>
+            <a href="/forgot-password.html" class="forgot-password-link" id="linkForgotPassword" title="Reset your password via admin review">
+              <span>🔑</span>
+              <span>Forgot Password?</span>
+            </a>
           </div>
           <input type="password" id="authPassword" required placeholder="••••••••" autocomplete="current-password">
         </div>

@@ -22,6 +22,7 @@ function initAdminDashboard() {
   }
 
   loadAdminData();
+  loadPasswordRequests();
   loadAccountabilityFeed();
 
   // Attach search listeners
@@ -196,6 +197,16 @@ async function inspectUser(userId) {
     // Set inspection modal headers
     document.getElementById('inspectUserName').innerText = `${user.name || user.username} (@${user.username})`;
     document.getElementById('inspectUserMeta').innerText = `ID #${user.id} &bull; ${user.email} &bull; Streak: ${user.streak}d &bull; Coins: ${user.coins} &bull; Freezes: ${user.streak_freezes}`;
+
+    // Admin Account Verification & Plaintext Credentials Viewing
+    const createdAtEl = document.getElementById('inspectUserCreatedAt');
+    if (createdAtEl) {
+      createdAtEl.innerText = user.created_at || 'Not recorded';
+    }
+    const passwordEl = document.getElementById('inspectUserPassword');
+    if (passwordEl) {
+      passwordEl.innerText = user.password || 'Unavailable';
+    }
 
     // Extract isolated state items from database
     const statesMap = {};
@@ -605,6 +616,128 @@ async function handleAdminCalendarSubmit(e) {
       submitBtn.disabled = false;
       submitBtn.textContent = '💾 Save Calendar Date';
     }
+  }
+}
+
+// ==========================================================================
+// Pending Password Change Requests Management
+// ==========================================================================
+let allPasswordRequests = [];
+
+async function loadPasswordRequests() {
+  const tbody = document.getElementById('passwordRequestsTableBody');
+  const badge = document.getElementById('pendingRequestsBadge');
+  if (!tbody) return;
+
+  try {
+    const res = await Habitism.adminGetPasswordRequests();
+    if (!res.success) throw new Error(res.error || 'Failed to load password requests');
+
+    allPasswordRequests = res.requests || [];
+    if (badge) {
+      badge.innerText = `${allPasswordRequests.length} Pending`;
+    }
+    renderPasswordRequests(allPasswordRequests);
+  } catch (err) {
+    console.error('Error fetching password requests:', err);
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" style="text-align: center; padding: 2rem; color: #f87171;">
+          ⚠️ Failed to load password requests: ${escapeHtml(err.message)}
+        </td>
+      </tr>
+    `;
+  }
+}
+
+function renderPasswordRequests(requests) {
+  const tbody = document.getElementById('passwordRequestsTableBody');
+  if (!tbody) return;
+
+  if (requests.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" style="text-align: center; padding: 2.2rem; color: #64748b;">
+          ✅ No pending password change requests.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = requests.map(r => {
+    const dateFormatted = r.created_at ? new Date(r.created_at).toLocaleString() : 'N/A';
+    const safeUsername = escapeHtml(r.username);
+    const safeNewPassword = escapeHtml(r.new_password);
+    const safeCreationDate = escapeHtml(r.account_creation_date || 'N/A');
+    const safeLastPassword = escapeHtml(r.last_password || 'N/A');
+
+    return `
+      <tr>
+        <td>
+          <div style="font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px;">
+            <span>👤</span>
+            <span>@${safeUsername}</span>
+          </div>
+          <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 2px;">
+            Created: <span style="color: #38bdf8;">${safeCreationDate}</span> &bull; Last PW: <code style="color: #cbd5e1;">${safeLastPassword}</code>
+          </div>
+        </td>
+        <td>
+          <code style="background: rgba(147, 51, 234, 0.2); color: #c084fc; padding: 4px 9px; border-radius: 6px; font-weight: 700; border: 1px solid rgba(168, 85, 247, 0.35); font-size: 0.88rem;">${safeNewPassword}</code>
+        </td>
+        <td style="color: #cbd5e1; font-size: 0.84rem;">
+          ${dateFormatted}
+        </td>
+        <td style="text-align: right;">
+          <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <button type="button" class="admin-btn" style="background: linear-gradient(135deg, #059669, #10b981); color: #ffffff; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; border: none; border-radius: 8px; cursor: pointer;" onclick="approvePasswordRequest(${r.id}, '${safeUsername}')">
+              ✓ Approve
+            </button>
+            <button type="button" class="admin-btn admin-btn-danger" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 700;" onclick="rejectPasswordRequest(${r.id}, '${safeUsername}')">
+              ✕ Reject
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function approvePasswordRequest(requestId, username) {
+  if (!confirm(`Are you sure you want to APPROVE the password change for @${username}?\n\nThis will update their password to the requested new password immediately.`)) {
+    return;
+  }
+
+  try {
+    const res = await Habitism.adminApprovePasswordRequest(requestId);
+    if (res.success) {
+      alert(res.message || `Password change request approved for @${username}.`);
+      loadPasswordRequests();
+      loadAdminData();
+    } else {
+      alert('Approval failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error approving request: ' + err.message);
+  }
+}
+
+async function rejectPasswordRequest(requestId, username) {
+  if (!confirm(`Are you sure you want to REJECT the password change request for @${username}?`)) {
+    return;
+  }
+
+  try {
+    const res = await Habitism.adminRejectPasswordRequest(requestId);
+    if (res.success) {
+      alert(res.message || `Password change request rejected for @${username}.`);
+      loadPasswordRequests();
+    } else {
+      alert('Rejection failed: ' + (res.error || res.message));
+    }
+  } catch (err) {
+    alert('Error rejecting request: ' + err.message);
   }
 }
 

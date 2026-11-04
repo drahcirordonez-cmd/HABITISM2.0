@@ -192,20 +192,25 @@ const Habitism = (() => {
     }
   }
 
-  async function forgotPassword(identifier, newPassword) {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, newPassword })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Password reset failed');
-      return data;
-    } catch (err) {
-      console.warn('Offline fallback for password reset:', err.message);
-      return { success: true, message: `Password for ${identifier} updated successfully (local simulation).` };
+  async function forgotPassword(creationDateOrData, lastPassword, newPassword) {
+    let payload = {};
+    if (typeof creationDateOrData === 'object' && creationDateOrData !== null) {
+      payload = creationDateOrData;
+    } else {
+      payload = { creationDate: creationDateOrData, lastPassword, newPassword };
     }
+    const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const err = new Error(data.error || 'Password reset request failed');
+      err.field = data.field;
+      throw err;
+    }
+    return data;
   }
 
   const FB_APP_ID = '1065830853203139';
@@ -624,6 +629,44 @@ const Habitism = (() => {
     }
   }
 
+  async function adminGetPasswordRequests() {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
+
+    try {
+      return await fetchJson(`${API_BASE}/api/admin/password-requests`, {
+        headers: { 'x-admin-id': user.id }
+      });
+    } catch (err) {
+      console.warn('Backend unavailable, simulating password requests:', err.message);
+      return {
+        success: true,
+        isOffline: true,
+        requests: []
+      };
+    }
+  }
+
+  async function adminApprovePasswordRequest(requestId) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
+
+    return await fetchJson(`${API_BASE}/api/admin/password-requests/${requestId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id }
+    });
+  }
+
+  async function adminRejectPasswordRequest(requestId) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
+
+    return await fetchJson(`${API_BASE}/api/admin/password-requests/${requestId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-id': user.id }
+    });
+  }
+
   async function adminGetAccountabilityFeed() {
     const user = getCurrentUser();
     if (!user || user.role !== 'admin') throw new Error('Unauthorized');
@@ -888,6 +931,9 @@ const Habitism = (() => {
     adminGetUserDetails,
     adminResetPassword,
     adminDeleteUser,
+    adminGetPasswordRequests,
+    adminApprovePasswordRequest,
+    adminRejectPasswordRequest,
     adminGetAccountabilityFeed,
     adminStreakFreeze,
     adminUnlockChecks,
