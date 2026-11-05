@@ -33,6 +33,7 @@ const Habitism = (() => {
     }
     return data;
   }
+
   const CURRENT_USER_KEY = 'habitism_current_user';
 
   // ==========================================================================
@@ -682,6 +683,68 @@ const Habitism = (() => {
     return data;
   }
 
+  async function adminReauth(adminPassword) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') {
+      throw new Error('Please log in as an administrator to view this page.');
+    }
+
+    const res = await fetch(`${API_BASE}/api/admin/reauth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-id': user.id
+      },
+      body: JSON.stringify({ adminId: user.id, adminPassword })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      const err = new Error(data.error || 'Incorrect admin password. Please try again.');
+      err.status = res.status;
+      throw err;
+    }
+
+    return data;
+  }
+
+  async function adminGetDatabaseTable(tableName, reauthToken, search = '') {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') {
+      throw new Error('Please log in as an administrator to view this page.');
+    }
+
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+
+    const res = await fetch(`${API_BASE}/api/admin/database/tables/${encodeURIComponent(tableName)}${qs}`, {
+      headers: {
+        'x-admin-id': user.id,
+        'x-reauth-token': reauthToken || ''
+      }
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      const err = new Error(data.error || 'Unable to load table data right now.');
+      err.status = res.status;
+      err.requiresReauth = !!data.requiresReauth;
+      throw err;
+    }
+
+    return data;
+  }
+
+  function adminExportDatabaseTableUrl(tableName, reauthToken, search = '') {
+    const user = getCurrentUser();
+    const params = new URLSearchParams();
+    if (user && user.id) params.set('adminId', user.id);
+    if (reauthToken) params.set('reauthToken', reauthToken);
+    if (search) params.set('search', search);
+    return `${API_BASE}/api/admin/database/tables/${encodeURIComponent(tableName)}/export?${params.toString()}`;
+  }
+
   async function adminDeleteUser(targetUserId) {
     const user = getCurrentUser();
     if (!user || user.role !== 'admin') throw new Error('Unauthorized');
@@ -1028,6 +1091,9 @@ const Habitism = (() => {
     adminGetUsers,
     adminGetUserDetails,
     adminViewUserPassword,
+    adminReauth,
+    adminGetDatabaseTable,
+    adminExportDatabaseTableUrl,
     adminResetPassword,
     adminDeleteUser,
     adminGetPasswordRequests,

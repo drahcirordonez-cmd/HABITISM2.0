@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HABITISM • Admin Live Database Viewer</title>
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="admin.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#9333ea">
+  <style>
+    .db-viewer-header {
+      background: rgba(18, 14, 38, 0.82);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      border-radius: 18px;
+      padding: 20px 24px;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(16px);
+    }
+
+    .db-jump-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+
+    .db-jump-pill {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #e2e8f0;
+      padding: 7px 13px;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .db-jump-pill:hover {
+      background: rgba(147, 51, 234, 0.25);
+      border-color: #a855f7;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .db-jump-count {
+      background: rgba(168, 85, 247, 0.25);
+      color: #e9d5ff;
+      padding: 1px 7px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .db-table-section {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 18px;
+      padding: 20px 22px;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      scroll-margin-top: 24px;
+    }
+
+    .db-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 14px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .db-section-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .db-table-name {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.02em;
+    }
+
+    .db-row-count-badge {
+      background: rgba(56, 189, 248, 0.16);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      padding: 3px 11px;
+      border-radius: 50px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .db-section-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .db-search-input {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 9px;
+      color: #ffffff;
+      padding: 7px 12px;
+      font-size: 0.84rem;
+      min-width: 220px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .db-search-input:focus {
+      border-color: #a855f7;
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.22);
+    }
+
+    .db-table-wrapper {
+      overflow-x: auto;
+      max-height: 420px;
+      overflow-y: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .db-live-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    .db-live-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #1e1b4b;
+      color: #c084fc;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.35);
+      white-space: nowrap;
+    }
+
+    .db-live-table tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      transition: background 0.15s ease;
+    }
+
+    .db-live-table tbody tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .db-live-table tbody tr:hover {
+      background: rgba(147, 51, 234, 0.12);
+    }
+
+    .db-live-table td {
+      padding: 10px 14px;
+      color: #e2e8f0;
+      vertical-align: top;
+      max-width: 360px;
+      word-break: break-word;
+    }
+
+    .db-empty-state {
+      text-align: center;
+      padding: 2.2rem 1rem;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .db-status-banner {
+      display: none;
+      padding: 12px 16px;
+      border-radius: 12px;
+      margin-bottom: 1.2rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .db-unauth-card {
+      max-width: 480px;
+      margin: 80px auto;
+      background: rgba(18, 14, 38, 0.88);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 20px;
+      padding: 2rem;
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+  <!-- Background Ambient Atmosphere -->
+  <div class="admin-bg-layer"></div>
+  <div class="admin-grid-pattern"></div>
+
+  <!-- Shown if visitor is not logged in as an administrator -->
+  <div id="unauthenticatedView" class="db-unauth-card">
+    <div style="font-size: 2.8rem; margin-bottom: 12px;">🔐</div>
+    <h2 style="margin: 0 0 8px 0; color: #ffffff;">Administrator Access Only</h2>
+    <p id="unauthenticatedMsg" style="color: #cbd5e1; font-size: 0.94rem; line-height: 1.5; margin-bottom: 20px;">
+      Please log in as an administrator to view this page.
+    </p>
+    <a href="login.html" class="admin-btn admin-btn-primary" style="text-decoration: none; padding: 10px 22px;">
+      <span>Go to Login Page →</span>
+    </a>
+  </div>
+
+  <!-- Main Authenticated Container -->
+  <div class="admin-container" id="dbViewerMainContainer" style="display: none;">
+
+    <!-- Top Navbar -->
+    <header class="admin-navbar">
+      <a href="admin.html" class="admin-brand">
+        <div class="admin-brand-icon">🗄️</div>
+        <div>
+          <div class="admin-brand-title">
+            <span>HABITISM</span>
+            <span class="admin-badge">Live SQLite Database Viewer</span>
+          </div>
+          <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
+            <span style="color: #34d399;">●</span> Native SQLite (<code>node:sqlite</code>) &bull; Parameterized Read-Only Inspector &bull; <code>busy_timeout = 5000ms</code>
+          </div>
+        </div>
+      </a>
+
+      <div class="admin-nav-actions">
+        <button type="button" id="dbSessionTimerBtn" class="admin-btn" style="background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.4); color: #34d399; padding: 6px 12px; font-size: 0.8rem;" onclick="lockDatabaseViewerSession()" title="Click to immediately lock your 5-minute database session">
+          <span>🔓 Verified (5m) &bull; Lock</span>
+        </button>
+
+        <button type="button" id="btnRefreshAllTables" class="admin-btn admin-btn-primary" onclick="refreshAllDatabaseTables()" title="Manually fetch latest rows from all 7 SQLite tables">
+          <span>🔄</span>
+          <span>Refresh All Tables</span>
+        </button>
+
+        <a href="admin.html" class="admin-btn admin-btn-secondary" title="Return to Administrator Control Panel">
+          <span>←</span>
+          <span>Back to Admin Panel</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Friendly Status / Error Banner -->
+    <div id="dbStatusBanner" class="db-status-banner"></div>
+
+    <!-- Header Summary Card -->
+    <div class="db-viewer-header">
+      <div>
+        <h2 style="margin: 0 0 4px 0; font-size: 1.3rem; color: #ffffff;">📊 Live SQLite Tables Inspector</h2>
+        <p style="margin: 0; font-size: 0.86rem; color: #94a3b8;">
+          Search rows in real time, inspect live database state during demos, or export any table to CSV. Use the manual <strong>Refresh</strong> button anytime you want fresh data.
+        </p>
+      </div>
+      <div style="font-size: 0.8rem; color: #cbd5e1; text-align: right;">
+        <div>Last Refreshed: <strong id="lastRefreshedTime" style="color: #38bdf8;">--</strong></div>
+        <div style="color: #94a3b8; margin-top: 2px;">7 Core SQLite Tables Mounted</div>
+      </div>
+    </div>
+
+    <!-- Quick Jump Bar -->
+    <nav class="db-jump-bar" aria-label="Database tables quick navigation">
+      <a href="#section-users" class="db-jump-pill">👥 users <span class="db-jump-count" id="jump-count-users">0</span></a>
+      <a href="#section-daily_logs" class="db-jump-pill">📅 daily_logs <span class="db-jump-count" id="jump-count-daily_logs">0</span></a>
+      <a href="#section-habits" class="db-jump-pill">✅ habits <span class="db-jump-count" id="jump-count-habits">0</span></a>
+      <a href="#section-user_task_states" class="db-jump-pill">🗂️ user_task_states <span class="db-jump-count" id="jump-count-user_task_states">0</span></a>
+      <a href="#section-accountability_posts" class="db-jump-pill">📢 accountability_posts <span class="db-jump-count" id="jump-count-accountability_posts">0</span></a>
+      <a href="#section-password_change_requests" class="db-jump-pill">🎫 password_change_requests <span class="db-jump-count" id="jump-count-password_change_requests">0</span></a>
+      <a href="#section-feedback" class="db-jump-pill">💬 feedback <span class="db-jump-count" id="jump-count-feedback">0</span></a>
+    </nav>
+
+    <!-- Dynamic Container for the 7 SQLite Tables -->
+    <div id="tablesContainer"></div>
+
+  </div>
+
+  <!-- Admin Re-Authentication Modal (Shown when 5-minute session expires or on direct page load) -->
+  <div id="dbPageReauthModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal-card" style="max-width: 440px;">
+      <div class="admin-modal-header">
+        <h3 style="margin: 0; font-size: 1.15rem; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+          <span>🔐</span>
+          <span>Confirm Admin Identity</span>
+        </h3>
+      </div>
+
+      <form id="dbPageReauthForm" onsubmit="handleDbPageReauthSubmit(event)">
+        <div class="admin-modal-body">
+          <p id="dbPageReauthPromptText" style="font-size: 0.88rem; color: #cbd5e1; margin: 0 0 1rem 0; line-height: 1.5;">
+            Please enter your administrator password to unlock the Live Database Viewer. Your session will remain active for <strong>5 minutes</strong>.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem;">
+            <label for="dbPageReauthPasswordInput" style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">
+              Admin Password:
+            </label>
+            <input
+              type="password"
+              id="dbPageReauthPasswordInput"
+              class="admin-input"
+              required
+              placeholder="Enter your admin password"
+              autocomplete="current-password">
+          </div>
+
+          <div id="dbPageReauthErrorMsg" style="font-size: 0.84rem; color: #f87171; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 12px; border-radius: 8px; margin-bottom: 0.8rem; display: none;"></div>
+        </div>
+
+        <div class="admin-modal-footer">
+          <a href="admin.html" class="admin-btn admin-btn-secondary" style="text-decoration: none;">← Back to Admin Panel</a>
+          <button type="submit" id="dbPageReauthConfirmBtn" class="admin-btn admin-btn-primary">
+            <span>🔓 Unlock Live Database</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js?v=2.4"></script>
+  <script>
+    const ADMIN_REAUTH_STORAGE_KEY = 'habitism_admin_reauth_session';
+
+    // Configuration for the 7 required SQLite tables
+    const TABLE_DEFINITIONS = [
+      {
+        name: 'users',
+        icon: '👥',
+        title: '1. users',
+        unitLabel: 'users',
+        description: 'Registered accounts, balances, streaks, streak freezes, and roles.',
+        columns: ['id', 'username', 'email', 'coins', 'streak', 'streak_freezes', 'role', 'created_at']
+      },
+      {
+        name: 'daily_logs',
+        icon: '📅',
+        title: '2. daily_logs',
+        unitLabel: 'daily logs',
+        description: 'Per-day habit completion counts and calendar glow statuses.',
+        columns: ['user_id', 'date_str', 'completed_count', 'total_count', 'status']
+      },
+      {
+        name: 'habits',
+        icon: '✅',
+        title: '3. habits',
+        unitLabel: 'habits',
+        description: 'Stored habit definitions associated with users and levels.',
+        columns: ['user_id', 'title', 'level_id', 'is_custom']
+      },
+      {
+        name: 'user_task_states',
+        icon: '🗂️',
+        title: '4. user_task_states',
+        unitLabel: 'task states',
+        description: 'Cloud-synced key-value state for daily checkmarks, custom habits, and active commitments.',
+        columns: ['user_id', 'state_key', 'state_value']
+      },
+      {
+        name: 'accountability_posts',
+        icon: '📢',
+        title: '5. accountability_posts',
+        unitLabel: 'accountability posts',
+        description: 'Facebook Graph API social penalty posts and streak-freeze shield logs.',
+        columns: ['user_id', 'user_name', 'message', 'status', 'created_at']
+      },
+      {
+        name: 'password_change_requests',
+        icon: '🎫',
+        title: '6. password_change_requests',
+        unitLabel: 'password change requests',
+        description: 'Account recovery tickets (AAAAAA000000) and review statuses.',
+        columns: ['user_id', 'ticket_number', 'status', 'created_at']
+      },
+      {
+        name: 'feedback',
+        icon: '💬',
+        title: '7. feedback',
+        unitLabel: 'feedback submissions',
+        description: 'User-submitted ideas, concerns, and bug reports.',
+        columns: ['user_id', 'type', 'message', 'status', 'created_at']
+      }
+    ];
+
+    // In-memory store for client-side real-time filtering & CSV export fallback
+    const tableDataStore = {};
+
+    function getSavedReauthSession() {
+      try {
+        const raw = sessionStorage.getItem(ADMIN_REAUTH_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.token && parsed.expiresAt > Date.now()) {
+          return parsed;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    function saveReauthSession(token, expiresInSeconds = 300) {
+      const session = {
+        token,
+        expiresAt: Date.now() + (expiresInSeconds * 1000)
+      };
+      try {
+        sessionStorage.setItem(ADMIN_REAUTH_STORAGE_KEY, JSON.stringify(session));
+      } catch (e) {}
+      updateSessionTimerUI();
+      return session;
+    }
+
+    function lockDatabaseViewerSession() {
+      try {
+        sessionStorage.removeItem(ADMIN_REAUTH_STORAGE_KEY);
+      } catch (e) {}
+      promptReauthModal('Your database viewer session has been locked. Enter your admin password to unlock it again.');
+    }
+
+    function updateSessionTimerUI() {
+      const btn = document.getElementById('dbSessionTimerBtn');
+      const session = getSavedReauthSession();
+      if (!session) {
+        if (btn) btn.style.display = 'none';
+        const mainContainer = document.getElementById('dbViewerMainContainer');
+        if (mainContainer && mainContainer.style.display !== 'none') {
+          promptReauthModal('Your 5-minute security session has expired. Please enter your admin password to continue viewing live data.');
+        }
+        return;
+      }
+
+      const remainingSec = Math.max(0, Math.ceil((session.expiresAt - Date.now()) / 1000));
+      const mins = Math.floor(remainingSec / 60);
+      const secs = String(remainingSec % 60).padStart(2, '0');
+      if (btn) {
+        btn.style.display = 'inline-flex';
+        btn.innerHTML = `<span>🔓 Verified (${mins}:${secs}) &bull; Lock</span>`;
+      }
+    }
+
+    function showBannerMessage(message, isError = false) {
+      const banner = document.getElementById('dbStatusBanner');
+      if (!banner) return;
+      banner.style.display = 'flex';
+      if (isError) {
+        banner.style.background = 'rgba(239, 68, 68, 0.14)';
+        banner.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        banner.style.color = '#fca5a5';
+      } else {
+        banner.style.background = 'rgba(52, 211, 153, 0.14)';
+        banner.style.border = '1px solid rgba(52, 211, 153, 0.4)';
+        banner.style.color = '#6ee7b7';
+      }
+      banner.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <button type="button" onclick="document.getElementById('dbStatusBanner').style.display='none'" style="background:none;border:none;color:inherit;font-size:1.1rem;cursor:pointer;">&times;</button>
+      `;
+    }
+
+    function buildTableSectionsSkeleton() {
+      const container = document.getElementById('tablesContainer');
+      if (!container) return;
+
+      container.innerHTML = TABLE_DEFINITIONS.map(def => `
+        <section class="db-table-section" id="section-${def.name}">
+          <div class="db-section-header">
+            <div>
+              <div class="db-section-title-group">
+                <span style="font-size: 1.25rem;">${def.icon}</span>
+                <span class="db-table-name">${def.title}</span>
+                <span class="db-row-count-badge" id="count-badge-${def.name}">0 ${def.unitLabel}</span>
+              </div>
+              <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
+                ${escapeHtml(def.description)}
+              </div>
+            </div>
+
+            <div class="db-section-controls">
+              <input
+                type="search"
+                class="db-search-input"
+                id="search-${def.name}"
+                placeholder="Search ${def.name}..."
+                oninput="filterTableRows('${def.name}')"
+                aria-label="Search ${def.name}">
+              <button type="button" class="admin-btn admin-btn-secondary" onclick="loadSingleDatabaseTable('${def.name}', true)" title="Refresh ${def.name} table">
+                <span>🔄</span>
+                <span>Refresh</span>
+              </button>
+              <button type="button" class="admin-btn admin-btn-primary" onclick="exportTableToCsv('${def.name}')" title="Download ${def.name} as CSV">
+                <span>📥</span>
+                <span>Download CSV</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="db-table-wrapper">
+            <table class="db-live-table">
+              <thead>
+                <tr>
+                  ${def.columns.map(col => `<th>${escapeHtml(col)}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody id="tbody-${def.name}">
+                <tr>
+                  <td colspan="${def.columns.length}" class="db-empty-state">
+                    Loading ${def.name}...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `).join('');
+    }
+
+    async function refreshAllDatabaseTables() {
+      const session = getSavedReauthSession();
+      if (!session) {
+        promptReauthModal('Please enter your admin password to load the live SQLite tables.');
+        return;
+      }
+
+      const refreshBtn = document.getElementById('btnRefreshAllTables');
+      if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<span>⏳</span><span>Refreshing...</span>';
+      }
+
+      try {
+        for (const def of TABLE_DEFINITIONS) {
+          await loadSingleDatabaseTable(def.name, false);
+        }
+        const timeEl = document.getElementById('lastRefreshedTime');
+        if (timeEl) timeEl.innerText = new Date().toLocaleTimeString();
+      } finally {
+        if (refreshBtn) {
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = '<span>🔄</span><span>Refresh All Tables</span>';
+        }
+      }
+    }
+
+    async function loadSingleDatabaseTable(tableName, showToast = false) {
+      const def = TABLE_DEFINITIONS.find(t => t.name === tableName);
+      if (!def) return;
+
+      const session = getSavedReauthSession();
+      if (!session) {
+        promptReauthModal('Your 5-minute security session has expired. Please enter your admin password to continue.');
+        return;
+      }
+
+      const tbody = document.getElementById(`tbody-${tableName}`);
+      try {
+        const res = await Habitism.adminGetDatabaseTable(tableName, session.token);
+        tableDataStore[tableName] = res.rows || [];
+        filterTableRows(tableName);
+
+        const jumpBadge = document.getElementById(`jump-count-${tableName}`);
+        if (jumpBadge) jumpBadge.innerText = (res.rows || []).length;
+
+        if (showToast) {
+          const timeEl = document.getElementById('lastRefreshedTime');
+          if (timeEl) timeEl.innerText = new Date().toLocaleTimeString();
+          showBannerMessage(`Refreshed "${tableName}" (${(res.rows || []).length} ${def.unitLabel}).`, false);
+        }
+      } catch (err) {
+        if (err.requiresReauth || err.status === 401) {
+          try { sessionStorage.removeItem(ADMIN_REAUTH_STORAGE_KEY); } catch (e) {}
+          promptReauthModal(err.message || 'Your 5-minute security session has expired. Please enter your admin password.');
+          return;
+        }
+        if (err.status === 403) {
+          showUnauthenticatedView(err.message || 'Please log in as an administrator to view this page.');
+          return;
+        }
+        showBannerMessage(err.message || 'The database is busy right now. Please try again in a few seconds.', true);
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="${def.columns.length}" class="db-empty-state" style="color: #fca5a5;">
+                ${escapeHtml(err.message || 'The database is busy right now. Please try again in a few seconds.')}
+              </td>
+            </tr>
+          `;
+        }
+      }
+    }
+
+    function filterTableRows(tableName) {
+      const def = TABLE_DEFINITIONS.find(t => t.name === tableName);
+      if (!def) return;
+
+      const allRows = tableDataStore[tableName] || [];
+      const searchInput = document.getElementById(`search-${tableName}`);
+      const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+      const filteredRows = !query
+        ? allRows
+        : allRows.filter(row =>
+            def.columns.some(col => {
+              const val = row[col];
+              return val !== null && val !== undefined && String(val).toLowerCase().includes(query);
+            })
+          );
+
+      const countBadge = document.getElementById(`count-badge-${tableName}`);
+      if (countBadge) {
+        countBadge.innerText = query
+          ? `${filteredRows.length} of ${allRows.length} ${def.unitLabel}`
+          : `${allRows.length} ${def.unitLabel}`;
+      }
+
+      const tbody = document.getElementById(`tbody-${tableName}`);
+      if (!tbody) return;
+
+      if (allRows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="${def.columns.length}" class="db-empty-state">
+              🌱 No records in <code>${escapeHtml(tableName)}</code> yet. New entries will appear here as users interact with Habitism!
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      if (filteredRows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="${def.columns.length}" class="db-empty-state">
+              🔍 No rows in <code>${escapeHtml(tableName)}</code> match "<strong>${escapeHtml(query)}</strong>". Try clearing your search filter.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filteredRows.map(row => `
+        <tr>
+          ${def.columns.map(col => {
+            const rawVal = row[col];
+            const displayVal = (rawVal === null || rawVal === undefined || rawVal === '')
+              ? '<span style="color: #64748b; font-style: italic;">null</span>'
+              : escapeHtml(String(rawVal));
+            return `<td>${displayVal}</td>`;
+          }).join('')}
+        </tr>
+      `).join('');
+    }
+
+    function exportTableToCsv(tableName) {
+      const session = getSavedReauthSession();
+      if (!session) {
+        promptReauthModal('Please confirm your admin password before exporting CSV files.');
+        return;
+      }
+
+      const searchInput = document.getElementById(`search-${tableName}`);
+      const query = (searchInput ? searchInput.value : '').trim();
+      const exportUrl = Habitism.adminExportDatabaseTableUrl(tableName, session.token, query);
+
+      const link = document.createElement('a');
+      link.href = exportUrl;
+      link.setAttribute('download', `habitism_${tableName}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function promptReauthModal(message) {
+      const modal = document.getElementById('dbPageReauthModal');
+      const promptText = document.getElementById('dbPageReauthPromptText');
+      const input = document.getElementById('dbPageReauthPasswordInput');
+      const errEl = document.getElementById('dbPageReauthErrorMsg');
+
+      if (promptText && message) promptText.innerText = message;
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.innerText = '';
+      }
+      if (input) {
+        input.value = '';
+        setTimeout(() => input.focus(), 60);
+      }
+      if (modal) modal.style.display = 'flex';
+    }
+
+    async function handleDbPageReauthSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('dbPageReauthPasswordInput');
+      const errEl = document.getElementById('dbPageReauthErrorMsg');
+      const confirmBtn = document.getElementById('dbPageReauthConfirmBtn');
+
+      const password = (input ? input.value : '').trim();
+      if (!password) return;
+
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span>Verifying...</span>';
+
+      try {
+        const res = await Habitism.adminReauth(password);
+        if (!res.success || !res.reauthToken) {
+          throw new Error(res.error || 'Incorrect admin password. Please try again.');
+        }
+
+        saveReauthSession(res.reauthToken, res.expiresIn || 300);
+        const modal = document.getElementById('dbPageReauthModal');
+        if (modal) modal.style.display = 'none';
+
+        await refreshAllDatabaseTables();
+      } catch (err) {
+        if (errEl) {
+          errEl.style.display = 'block';
+          errEl.innerText = err.message || 'Incorrect admin password. Please try again.';
+        }
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<span>🔓 Unlock Live Database</span>';
+      }
+    }
+
+    function showUnauthenticatedView(msg) {
+      const unauth = document.getElementById('unauthenticatedView');
+      const unauthMsg = document.getElementById('unauthenticatedMsg');
+      const mainContainer = document.getElementById('dbViewerMainContainer');
+      const modal = document.getElementById('dbPageReauthModal');
+
+      if (mainContainer) mainContainer.style.display = 'none';
+      if (modal) modal.style.display = 'none';
+      if (unauthMsg && msg) unauthMsg.innerText = msg;
+      if (unauth) unauth.style.display = 'block';
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = Habitism.getCurrentUser();
+      if (!user || user.role !== 'admin') {
+        showUnauthenticatedView('Please log in as an administrator to view this page.');
+        return;
+      }
+
+      document.getElementById('dbViewerMainContainer').style.display = 'block';
+      buildTableSectionsSkeleton();
+      updateSessionTimerUI();
+      setInterval(updateSessionTimerUI, 1000);
+
+      if (getSavedReauthSession()) {
+        refreshAllDatabaseTables();
+      } else {
+        promptReauthModal('Please enter your administrator password to unlock the Live Database Viewer (active for 5 minutes).');
+      }
+    });
+  </script>
+</body>
+</html>

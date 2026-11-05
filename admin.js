@@ -397,18 +397,53 @@ async function handleAdminPasswordSubmit(e) {
 }
 
 // ==========================================================================
-// Admin Re-Authentication & Password Viewing System
+// Admin Re-Authentication & Password Viewing System (5-Minute Shared Session)
 // ==========================================================================
-let adminReauthSession = {
-  token: null,
-  expiresAt: 0
-};
+const ADMIN_REAUTH_STORAGE_KEY = 'habitism_admin_reauth_session';
+
+let adminReauthSession = (() => {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_REAUTH_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.token && parsed.expiresAt > Date.now()) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  return { token: null, expiresAt: 0 };
+})();
+
 let currentPasswordRequestUserId = null;
 let currentPasswordRequestUsername = null;
 let revealedPasswordValue = null;
 
+function saveAdminReauthSession(token, expiresInSeconds = 300) {
+  adminReauthSession = {
+    token,
+    expiresAt: Date.now() + (expiresInSeconds * 1000)
+  };
+  try {
+    sessionStorage.setItem(ADMIN_REAUTH_STORAGE_KEY, JSON.stringify(adminReauthSession));
+  } catch (e) {}
+  updateReauthSessionIndicator();
+}
+
 function hasValidReauthSession() {
-  return adminReauthSession.token && Date.now() < adminReauthSession.expiresAt;
+  if (!adminReauthSession.token || Date.now() >= adminReauthSession.expiresAt) {
+    try {
+      const raw = sessionStorage.getItem(ADMIN_REAUTH_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.token && parsed.expiresAt > Date.now()) {
+          adminReauthSession = parsed;
+          return true;
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+  return true;
 }
 
 function updateReauthSessionIndicator() {
@@ -426,6 +461,9 @@ function updateReauthSessionIndicator() {
 function clearAdminReauthSession() {
   adminReauthSession.token = null;
   adminReauthSession.expiresAt = 0;
+  try {
+    sessionStorage.removeItem(ADMIN_REAUTH_STORAGE_KEY);
+  } catch (e) {}
   updateReauthSessionIndicator();
 
   // Mask inspect modal password if open
@@ -437,6 +475,81 @@ function clearAdminReauthSession() {
   const inspectBtn = document.getElementById('btnInspectViewPassword');
   if (inspectBtn) {
     inspectBtn.innerHTML = '<span>👁️ View Password</span>';
+  }
+}
+
+// ==========================================================================
+// Live Database Viewer Launch & Re-Auth Flow
+// ==========================================================================
+function handleOpenLiveDatabaseViewer() {
+  const user = Habitism.getCurrentUser();
+  if (!user || user.role !== 'admin') {
+    alert('Please log in as an administrator to view this page.');
+    return;
+  }
+
+  // If 5-minute session is already active, open Live Database Viewer directly
+  if (hasValidReauthSession()) {
+    window.location.href = 'admin-database.html';
+    return;
+  }
+
+  // Otherwise prompt for admin password re-authentication first
+  const modal = document.getElementById('adminDbReauthModal');
+  const input = document.getElementById('adminDbReauthPasswordInput');
+  const errEl = document.getElementById('adminDbReauthErrorMsg');
+
+  if (input) {
+    input.value = '';
+    setTimeout(() => input.focus(), 60);
+  }
+  if (errEl) {
+    errEl.style.display = 'none';
+    errEl.innerText = '';
+  }
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeAdminDbReauthModal() {
+  const modal = document.getElementById('adminDbReauthModal');
+  if (modal) modal.style.display = 'none';
+  const input = document.getElementById('adminDbReauthPasswordInput');
+  if (input) input.value = '';
+}
+
+async function handleAdminDbReauthSubmit(e) {
+  e.preventDefault();
+  const input = document.getElementById('adminDbReauthPasswordInput');
+  const errorMsg = document.getElementById('adminDbReauthErrorMsg');
+  const confirmBtn = document.getElementById('adminDbReauthConfirmBtn');
+
+  const adminPassword = (input?.value || '').trim();
+  if (!adminPassword) return;
+
+  confirmBtn.disabled = true;
+  confirmBtn.innerHTML = '<span>Verifying...</span>';
+
+  try {
+    const res = await Habitism.adminReauth(adminPassword);
+    if (!res.success || !res.reauthToken) {
+      throw new Error(res.error || 'Incorrect admin password. Please try again.');
+    }
+
+    saveAdminReauthSession(res.reauthToken, res.expiresIn || 300);
+    closeAdminDbReauthModal();
+    window.location.href = 'admin-database.html';
+  } catch (err) {
+    if (errorMsg) {
+      errorMsg.style.display = 'block';
+      errorMsg.innerText = err.message || 'Incorrect admin password. Please try again.';
+    }
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = '<span>🔓 Verify &amp; Open Viewer</span>';
   }
 }
 
@@ -502,11 +615,7 @@ async function handleAdminReauthSubmit(e) {
 
     // Save session cache (5 minutes)
     if (res.reauthToken) {
-      adminReauthSession = {
-        token: res.reauthToken,
-        expiresAt: Date.now() + ((res.expiresIn || 300) * 1000)
-      };
-      updateReauthSessionIndicator();
+      saveAdminReauthSession(res.reauthToken, res.expiresIn || 300);
     }
 
     closeAdminReauthModal();

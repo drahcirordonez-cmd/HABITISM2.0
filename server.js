@@ -34,6 +34,12 @@ if (!fs.existsSync(dataDir)) {
 const dbPath = path.join(dataDir, 'habitism.db');
 const db = new DatabaseSync(dbPath);
 
+// Polyfill db.pragma() for node:sqlite DatabaseSync & set 5000ms busy timeout to prevent SQLite write locks
+if (typeof db.pragma !== 'function') {
+  db.pragma = (statement) => db.exec(`PRAGMA ${statement};`);
+}
+db.pragma('busy_timeout = 5000');
+
 // Initialize Tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -1644,6 +1650,259 @@ function handleAdminViewPassword(req, res) {
 
 app.post('/api/admin/users/:targetUserId/view-password', handleAdminViewPassword);
 app.post('/api/admin/users/:userId/view-password', handleAdminViewPassword);
+
+// ============================================================================
+// ADMIN: Standalone Re-Authentication Endpoint (5-Minute Session Token)
+// ============================================================================
+app.post('/api/admin/reauth', (req, res) => {
+  try {
+    const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+    const { adminPassword } = req.body || {};
+
+    if (!verifyAdmin(adminId)) {
+      return res.status(403).json({
+        error: 'Please log in as an administrator to view this page.'
+      });
+    }
+
+    const numAdminId = Number(adminId);
+    const adminUser = db.prepare('SELECT id, username, password, role FROM users WHERE id = ?').get(numAdminId);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Please log in as an administrator to view this page.'
+      });
+    }
+
+    if (!adminPassword || typeof adminPassword !== 'string' || adminPassword !== adminUser.password) {
+      return res.status(403).json({
+        error: 'Incorrect admin password. Please double-check your password and try again.'
+      });
+    }
+
+    const now = Date.now();
+    const expiresIn = 300; // 5 minutes (300 seconds)
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = now + (expiresIn * 1000);
+
+    adminReauthSessions.set(numAdminId, { token, expiresAt });
+
+    return res.json({
+      success: true,
+      reauthToken: token,
+      expiresIn,
+      expiresAt,
+      message: 'Identity confirmed! Your admin session is active for 5 minutes.'
+    });
+  } catch (err) {
+    if (err.message && (err.message.includes('SQLITE_BUSY') || err.message.includes('locked'))) {
+      return res.status(503).json({
+        error: 'The database is busy right now. Please try again in a few seconds.'
+      });
+    }
+    return res.status(500).json({ error: 'Unable to verify admin session right now. Please try again.' });
+  }
+});
+
+// ============================================================================
+// ADMIN: Live Database Viewer API (7 Allowlisted Tables + CSV Export)
+// ============================================================================
+const LIVE_DATABASE_TABLES = {
+  users: {
+    table: 'users',
+    label: 'users',
+    columns: ['id', 'username', 'email', 'coins', 'streak', 'streak_freezes', 'role', 'created_at'],
+    orderBy: 'id ASC'
+  },
+  daily_logs: {
+    table: 'daily_logs',
+    label: 'daily logs',
+    columns: ['user_id', 'date_str', 'completed_count', 'total_count', 'status'],
+    orderBy: 'id DESC'
+  },
+  habits: {
+    table: 'habits',
+    label: 'habits',
+    columns: ['user_id', 'title', 'level_id', 'is_custom'],
+    orderBy: 'id DESC'
+  },
+  user_task_states: {
+    table: 'user_task_states',
+    label: 'task states',
+    columns: ['user_id', 'state_key', 'state_value'],
+    orderBy: 'user_id ASC, state_key ASC'
+  },
+  accountability_posts: {
+    table: 'accountability_posts',
+    label: 'accountability posts',
+    columns: ['user_id', 'user_name', 'message', 'status', 'created_at'],
+    orderBy: 'id DESC'
+  },
+  password_change_requests: {
+    table: 'password_change_requests',
+    label: 'password change requests',
+    columns: ['user_id', 'ticket_number', 'status', 'created_at'],
+    orderBy: 'id DESC'
+  },
+  feedback: {
+    table: 'feedback',
+    label: 'feedback items',
+    columns: ['user_id', 'type', 'message', 'status', 'created_at'],
+    orderBy: 'id DESC'
+  }
+};
+
+function verifyAdminDatabaseSession(req, res) {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId;
+  const reauthToken = req.headers['x-reauth-token'] || req.query.reauthToken;
+
+  if (!verifyAdmin(adminId)) {
+    res.status(403).json({
+      error: 'Please log in as an administrator to view this page.'
+    });
+    return null;
+  }
+
+  const numAdminId = Number(adminId);
+  const session = adminReauthSessions.get(numAdminId);
+  const now = Date.now();
+
+  if (!reauthToken || !session || session.token !== reauthToken || session.expiresAt <= now) {
+    res.status(401).json({
+      error: 'Your 5-minute security session has expired. Please enter your admin password to continue viewing the live database.',
+      requiresReauth: true
+    });
+    return null;
+  }
+
+  return { adminId: numAdminId, session };
+}
+
+// 1. GET /api/admin/database/tables/:tableName -> Paginated & filtered rows
+app.get('/api/admin/database/tables/:tableName', (req, res) => {
+  try {
+    const auth = verifyAdminDatabaseSession(req, res);
+    if (!auth) return;
+
+    const tableName = (req.params.tableName || '').trim();
+    const config = LIVE_DATABASE_TABLES[tableName];
+
+    if (!config) {
+      return res.status(400).json({
+        error: 'That table is not available in the Live Database Viewer.'
+      });
+    }
+
+    const search = (req.query.search || '').trim();
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 500, 1), 2000);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    const colList = config.columns.join(', ');
+    let whereClause = '';
+    const params = [];
+
+    if (search) {
+      const searchConditions = config.columns.map(col => `CAST(${col} AS TEXT) LIKE ?`);
+      whereClause = `WHERE (${searchConditions.join(' OR ')})`;
+      config.columns.forEach(() => params.push(`%${search}%`));
+    }
+
+    const countRow = db.prepare(`SELECT COUNT(*) AS total FROM ${config.table} ${whereClause}`).get(...params);
+    const totalCount = countRow ? countRow.total : 0;
+
+    const querySql = `
+      SELECT ${colList}
+      FROM ${config.table}
+      ${whereClause}
+      ORDER BY ${config.orderBy}
+      LIMIT ? OFFSET ?
+    `;
+    const rows = db.prepare(querySql).all(...params, limit, offset);
+
+    return res.json({
+      success: true,
+      table: config.table,
+      label: config.label,
+      columns: config.columns,
+      count: rows.length,
+      totalCount,
+      rows
+    });
+  } catch (err) {
+    if (err.message && (err.message.includes('SQLITE_BUSY') || err.message.includes('locked'))) {
+      return res.status(503).json({
+        error: 'The database is busy right now. Please try again in a few seconds.'
+      });
+    }
+    console.error('Error querying live database table:', err.message);
+    return res.status(500).json({
+      error: 'Something went wrong while reading the database table. Please try refreshing.'
+    });
+  }
+});
+
+// 2. GET /api/admin/database/tables/:tableName/export -> CSV Download
+app.get('/api/admin/database/tables/:tableName/export', (req, res) => {
+  try {
+    const auth = verifyAdminDatabaseSession(req, res);
+    if (!auth) return;
+
+    const tableName = (req.params.tableName || '').trim();
+    const config = LIVE_DATABASE_TABLES[tableName];
+
+    if (!config) {
+      return res.status(400).json({
+        error: 'That table is not available for CSV export.'
+      });
+    }
+
+    const search = (req.query.search || '').trim();
+    const colList = config.columns.join(', ');
+    let whereClause = '';
+    const params = [];
+
+    if (search) {
+      const searchConditions = config.columns.map(col => `CAST(${col} AS TEXT) LIKE ?`);
+      whereClause = `WHERE (${searchConditions.join(' OR ')})`;
+      config.columns.forEach(() => params.push(`%${search}%`));
+    }
+
+    const rows = db.prepare(`
+      SELECT ${colList}
+      FROM ${config.table}
+      ${whereClause}
+      ORDER BY ${config.orderBy}
+    `).all(...params);
+
+    const escapeCsvValue = (val) => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      if (/[",\r\n]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const headerLine = config.columns.map(escapeCsvValue).join(',');
+    const dataLines = rows.map(row =>
+      config.columns.map(col => escapeCsvValue(row[col])).join(',')
+    );
+    const csvContent = [headerLine, ...dataLines].join('\r\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="habitism_${config.table}.csv"`);
+    return res.status(200).send(csvContent);
+  } catch (err) {
+    if (err.message && (err.message.includes('SQLITE_BUSY') || err.message.includes('locked'))) {
+      return res.status(503).json({
+        error: 'The database is busy right now. Please try again in a few seconds.'
+      });
+    }
+    console.error('Error exporting CSV:', err.message);
+    return res.status(500).json({
+      error: 'Could not export the CSV file right now. Please try again in a moment.'
+    });
+  }
+});
 
 // ============================================================================
 // ADMIN: Add / Remove Streak Freezes for a user

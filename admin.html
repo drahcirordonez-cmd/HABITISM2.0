@@ -43,6 +43,11 @@
           <span>🔓 Verified (5m) &bull; Lock</span>
         </button>
 
+        <button type="button" id="btnViewLiveDatabase" class="admin-btn admin-btn-primary" onclick="handleOpenLiveDatabaseViewer()" title="Verify admin password to inspect all live SQLite tables">
+          <span>🗄️</span>
+          <span>View Live Database</span>
+        </button>
+
         <button type="button" class="admin-btn admin-btn-secondary" onclick="openAdminManualModal()" title="Open the Habitism Administrator Manual">
           <span>📘</span>
           <span>Admin Manual</span>
@@ -654,6 +659,49 @@
           <span>Done</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Admin Re-Authentication Modal for Live Database Viewer -->
+  <div id="adminDbReauthModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal-card" style="max-width: 440px;">
+      <div class="admin-modal-header">
+        <h3 style="margin: 0; font-size: 1.15rem; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+          <span>🗄️</span>
+          <span>Unlock Live Database Viewer</span>
+        </h3>
+        <button type="button" onclick="closeAdminDbReauthModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">&times;</button>
+      </div>
+
+      <form id="adminDbReauthForm" onsubmit="handleAdminDbReauthSubmit(event)">
+        <div class="admin-modal-body">
+          <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0 0 1rem 0; line-height: 1.5;">
+            For security, please confirm your administrator password before opening the Live SQLite Database Viewer. Your verified session will stay active for <strong>5 minutes</strong>.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem;">
+            <label for="adminDbReauthPasswordInput" style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">
+              Enter your admin password:
+            </label>
+            <input
+              type="password"
+              id="adminDbReauthPasswordInput"
+              class="admin-input"
+              required
+              placeholder="Enter your admin password"
+              autocomplete="current-password">
+          </div>
+
+          <div id="adminDbReauthErrorMsg" style="font-size: 0.84rem; color: #f87171; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 12px; border-radius: 8px; margin-bottom: 0.8rem; display: none;"></div>
+        </div>
+
+        <div class="admin-modal-footer">
+          <button type="button" class="admin-btn admin-btn-secondary" onclick="closeAdminDbReauthModal()">Cancel</button>
+          <button type="submit" id="adminDbReauthConfirmBtn" class="admin-btn admin-btn-primary">
+            <span>🔓 Verify &amp; Open Viewer</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
