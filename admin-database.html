@@ -442,11 +442,13 @@
 
     function updateSessionTimerUI() {
       const btn = document.getElementById('dbSessionTimerBtn');
+      const modal = document.getElementById('dbPageReauthModal');
       const session = getSavedReauthSession();
       if (!session) {
         if (btn) btn.style.display = 'none';
         const mainContainer = document.getElementById('dbViewerMainContainer');
-        if (mainContainer && mainContainer.style.display !== 'none') {
+        const isModalAlreadyOpen = modal && modal.style.display === 'flex';
+        if (mainContainer && mainContainer.style.display !== 'none' && !isModalAlreadyOpen) {
           promptReauthModal('Your 5-minute security session has expired. Please enter your admin password to continue viewing live data.');
         }
         return;
@@ -698,6 +700,12 @@
       const input = document.getElementById('dbPageReauthPasswordInput');
       const errEl = document.getElementById('dbPageReauthErrorMsg');
 
+      // If the re-auth modal is already open, do NOT clear or reset the password input while the admin is typing!
+      if (modal && modal.style.display === 'flex') {
+        if (promptText && message) promptText.innerText = message;
+        return;
+      }
+
       if (promptText && message) promptText.innerText = message;
       if (errEl) {
         errEl.style.display = 'none';
@@ -791,3 +799,4 @@
   </script>
 </body>
 </html>
+
