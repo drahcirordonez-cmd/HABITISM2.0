@@ -171,31 +171,31 @@
     <form id="signupForm" novalidate onsubmit="handleSignupSubmit(event)">
       <div class="form-group">
         <label for="signupName">Full Name</label>
-        <input type="text" id="signupName" placeholder="e.g. John Doe" autocomplete="name">
+        <input type="text" id="signupName" placeholder="e.g. John Doe" autocomplete="name" maxlength="80">
         <div class="field-error" id="nameError"></div>
       </div>
 
       <div class="form-group">
         <label for="signupUsername">Username</label>
-        <input type="text" id="signupUsername" placeholder="e.g. johndoe" autocomplete="username">
+        <input type="text" id="signupUsername" placeholder="e.g. johndoe (max 16, letters & numbers)" autocomplete="username" maxlength="16">
         <div class="field-error" id="usernameError"></div>
       </div>
 
       <div class="form-group">
         <label for="signupEmail">Email Address</label>
-        <input type="email" id="signupEmail" placeholder="john@example.com" autocomplete="email">
+        <input type="email" id="signupEmail" placeholder="john@example.com" autocomplete="email" maxlength="254">
         <div class="field-error" id="emailError"></div>
       </div>
 
       <div class="form-group">
         <label for="signupPassword">Password</label>
-        <input type="password" id="signupPassword" placeholder="Minimum 8 characters" autocomplete="new-password">
+        <input type="password" id="signupPassword" placeholder="8-64 chars, min 1 letter & 1 number" autocomplete="new-password" minlength="8" maxlength="64">
         <div class="field-error" id="passwordError"></div>
       </div>
 
       <div class="form-group">
         <label for="signupConfirmPassword">Confirm Password</label>
-        <input type="password" id="signupConfirmPassword" placeholder="Re-enter password" autocomplete="new-password">
+        <input type="password" id="signupConfirmPassword" placeholder="Re-enter password" autocomplete="new-password" minlength="8" maxlength="64">
         <div class="field-error" id="confirmPasswordError"></div>
       </div>
 
@@ -228,14 +228,19 @@
       }
     }
 
+    // -------------------------------------------------------------
     // Name field validation:
+    // - Limit: 80 characters.
     // - Allowed: letters (a-z, A-Z), spaces, hyphens, apostrophes, periods.
     // - Blocked: numbers, special characters (@#$% etc.).
-    // - Error: "Name cannot contain numbers or special characters."
+    // -------------------------------------------------------------
     function validateName(value) {
       const name = (value || '').trim();
       if (!name) {
         return "Name is required.";
+      }
+      if (name.length > 80) {
+        return "Name cannot exceed 80 characters.";
       }
       const allowedRegex = /^[a-zA-Z\s\-'.]+$/;
       if (!allowedRegex.test(name) || !/[a-zA-Z]/.test(name)) {
@@ -244,7 +249,11 @@
       return "";
     }
 
-    // Username validation
+    // -------------------------------------------------------------
+    // Username validation:
+    // - Limit: upto 16 characters (min 3).
+    // - Allowed: letters and numbers only (a-z, A-Z, 0-9).
+    // -------------------------------------------------------------
     function validateUsername(value) {
       const username = (value || '').trim();
       if (!username) {
@@ -253,38 +262,53 @@
       if (username.length < 3) {
         return "Username must be at least 3 characters.";
       }
-      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-        return "Username can only contain letters, numbers, underscores, and hyphens.";
+      if (username.length > 16) {
+        return "Username cannot exceed 16 characters.";
+      }
+      if (!/^[a-zA-Z0-9]+$/.test(username)) {
+        return "Username can only contain letters and numbers.";
       }
       return "";
     }
 
+    // -------------------------------------------------------------
     // Email field validation:
-    // - Must contain one @.
-    // - Local part: letters, numbers, dots, underscores, hyphens.
-    // - Domain: must contain at least one dot and a TLD of 2+ letters (.com, .org, etc.).
-    // - Reject consecutive dots, leading/trailing dots, spaces.
-    // - Errors: specify exactly what's missing.
+    // - Trim leading/trailing whitespace.
+    // - No spaces allowed anywhere.
+    // - Restrict total length to 254 characters (RFC 5321).
+    // - Exactly one '@' symbol.
+    // - Local part: max 64 characters; cannot start/end with dot;
+    //   accept letters, numbers, dots, underscores, hyphens, plus (+).
+    // - Domain: must contain at least one dot (.).
+    // - Prevent consecutive dots (..).
+    // - Domain cannot start or end with a dot (.) or a hyphen (-).
+    // - Domain labels cannot start or end with hyphen.
+    // - Valid TLD (at least 2 letters, e.g. .com, .org).
+    // - Real-world provider compliant (Gmail, Outlook, Yahoo, etc.).
+    // -------------------------------------------------------------
     function validateEmail(value) {
-      const raw = value || '';
-      if (!raw.trim()) {
+      const raw = value === null || value === undefined ? '' : String(value);
+      const email = raw.trim();
+
+      if (!email) {
         return "Email address is required.";
       }
-      if (/\s/.test(raw)) {
-        return "Email cannot contain spaces.";
+      if (/\s/.test(email)) {
+        return "Email address cannot contain spaces.";
       }
-      const email = raw.trim();
+      if (email.length > 254) {
+        return "Email address cannot exceed 254 characters.";
+      }
+      if (email.includes('..')) {
+        return "Email address cannot contain consecutive dots ('..').";
+      }
 
       const atMatches = email.match(/@/g);
       if (!atMatches || atMatches.length === 0) {
         return "Email must contain an '@' symbol.";
       }
       if (atMatches.length > 1) {
-        return "Email can only contain one '@' symbol.";
-      }
-
-      if (email.includes('..')) {
-        return "Email cannot contain consecutive dots.";
+        return "Email must contain exactly one '@' symbol.";
       }
 
       const atIndex = email.indexOf('@');
@@ -294,64 +318,94 @@
       if (!localPart) {
         return "Email is missing a username before '@'.";
       }
-      if (!domain) {
-        return "Email is missing a domain after '@' (e.g., example.com).";
+      if (localPart.length > 64) {
+        return "The part before '@' cannot exceed 64 characters.";
       }
-
       if (localPart.startsWith('.') || localPart.endsWith('.')) {
-        return "Email username cannot start or end with a dot.";
+        return "The part before '@' cannot start or end with a dot.";
+      }
+      if (!/^[a-zA-Z0-9._+-]+$/.test(localPart)) {
+        return "The part before '@' can only contain letters, numbers, dots, underscores, hyphens, or '+'.";
       }
 
-      if (!/^[a-zA-Z0-9._-]+$/.test(localPart)) {
-        return "Email username can only contain letters, numbers, dots, underscores, and hyphens.";
+      if (!domain) {
+        return "Email is missing a domain after '@' (e.g. example.com).";
       }
-
       if (domain.startsWith('.') || domain.endsWith('.')) {
         return "Email domain cannot start or end with a dot.";
       }
-
+      if (domain.startsWith('-') || domain.endsWith('-')) {
+        return "Email domain cannot start or end with a hyphen.";
+      }
       if (!domain.includes('.')) {
-        return "Email domain must contain at least one dot (e.g., example.com).";
+        return "Email domain must contain at least one dot (e.g. example.com).";
       }
 
       const domainParts = domain.split('.');
-      const tld = domainParts[domainParts.length - 1];
+      if (domainParts.length < 2) {
+        return "Email domain must contain a valid top-level domain (e.g. .com).";
+      }
 
-      for (let i = 0; i < domainParts.length - 1; i++) {
+      for (let i = 0; i < domainParts.length; i++) {
         const part = domainParts[i];
         if (!part) {
           return "Email domain contains an empty segment.";
         }
-        if (!/^[a-zA-Z0-9-]+$/.test(part)) {
-          return "Email domain contains invalid characters.";
-        }
         if (part.startsWith('-') || part.endsWith('-')) {
           return "Email domain segments cannot start or end with a hyphen.";
         }
+        if (!/^[a-zA-Z0-9-]+$/.test(part)) {
+          return "Email domain contains invalid characters.";
+        }
+        if (part.length > 63) {
+          return "Email domain segment cannot exceed 63 characters.";
+        }
       }
 
+      const tld = domainParts[domainParts.length - 1];
       if (!/^[a-zA-Z]{2,}$/.test(tld)) {
-        return "Email must include a valid top-level domain like .com";
+        return "Email must end with a valid domain extension like .com or .org.";
       }
 
       return "";
     }
 
-    // Password validation: Minimum 8 characters
+    // -------------------------------------------------------------
+    // Password validation:
+    // - Required.
+    // - No spaces allowed.
+    // - Minimum length: 8 characters.
+    // - Maximum length: 64 characters.
+    // - Must contain at least 1 letter (a-z, A-Z).
+    // - Must contain at least 1 number (0-9).
+    // - Specific messages for each failed requirement.
+    // -------------------------------------------------------------
     function validatePassword(value) {
-      const password = value || '';
+      const password = value === null || value === undefined ? '' : String(value);
       if (!password) {
         return "Password is required.";
       }
+      if (/\s/.test(password)) {
+        return "Password cannot contain spaces.";
+      }
       if (password.length < 8) {
-        return "Password must be at least 8 characters.";
+        return "Password must be at least 8 characters long.";
+      }
+      if (password.length > 64) {
+        return "Password cannot exceed 64 characters.";
+      }
+      if (!/[a-zA-Z]/.test(password)) {
+        return "Password must contain at least one letter (a-z, A-Z).";
+      }
+      if (!/[0-9]/.test(password)) {
+        return "Password must contain at least one number (0-9).";
       }
       return "";
     }
 
     // Confirm Password validation: Must match password
     function validateConfirmPassword(confirmVal, passwordVal) {
-      const confirm = confirmVal || '';
+      const confirm = confirmVal === null || confirmVal === undefined ? '' : String(confirmVal);
       if (!confirm) {
         return "Please confirm your password.";
       }
