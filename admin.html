@@ -184,15 +184,18 @@
         <table class="admin-table">
           <thead>
             <tr>
+              <th>Ticket Number</th>
               <th>Target Username</th>
               <th>Requested New Password</th>
               <th>Request Date</th>
+              <th>Core Verifier Answer (for admin verification)</th>
+              <th>Status</th>
               <th style="text-align: right;">Actions</th>
             </tr>
           </thead>
           <tbody id="passwordRequestsTableBody">
             <tr>
-              <td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">
+              <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
                 Loading pending password change requests...
               </td>
             </tr>
@@ -346,6 +349,10 @@
                 </button>
               </div>
               <strong id="inspectUserPassword" style="color: #94a3b8; font-family: monospace; font-size: 0.92rem; word-break: break-all;">••••••••</strong>
+            </div>
+            <div style="background: rgba(0,0,0,0.28); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); grid-column: 1 / -1;">
+              <span style="color: #94a3b8; font-size: 0.76rem; display: block; margin-bottom: 2px;">🌸 Stored Core Verifier Answer (Who they love most):</span>
+              <strong id="inspectUserCoreVerifier" style="color: #c084fc; font-size: 0.92rem;">--</strong>
             </div>
           </div>
         </div>

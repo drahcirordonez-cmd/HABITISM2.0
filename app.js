@@ -127,11 +127,11 @@ const Habitism = (() => {
   // ==========================================================================
   // 2. Authentication API (Server + Client fallback)
   // ==========================================================================
-  async function register(name, username, email, password) {
+  async function register(name, username, email, password, coreVerifier) {
     const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, username, email, password })
+      body: JSON.stringify({ name, username, email, password, coreVerifier })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -192,12 +192,12 @@ const Habitism = (() => {
     }
   }
 
-  async function forgotPassword(identifierOrData, creationDate, lastPassword, newPassword) {
+  async function forgotPassword(identifierOrData, creationDate, lastPassword, newPassword, coreVerifier) {
     let payload = {};
     if (typeof identifierOrData === 'object' && identifierOrData !== null) {
       payload = identifierOrData;
     } else {
-      payload = { identifier: identifierOrData, creationDate, lastPassword, newPassword };
+      payload = { identifier: identifierOrData, creationDate, lastPassword, newPassword, coreVerifier };
     }
     const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
       method: 'POST',
@@ -208,6 +208,9 @@ const Habitism = (() => {
     if (!res.ok) {
       const err = new Error(data.error || 'Password reset request failed');
       err.field = data.field;
+      err.ticketNumber = data.ticketNumber;
+      err.fbPageUrl = data.fbPageUrl;
+      err.hasPending = data.hasPending;
       throw err;
     }
     return data;

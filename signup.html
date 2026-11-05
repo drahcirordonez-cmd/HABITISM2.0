@@ -199,6 +199,15 @@
         <div class="field-error" id="confirmPasswordError"></div>
       </div>
 
+      <div class="form-group">
+        <label for="signupCoreVerifier">Who do you love the most?</label>
+        <input type="text" id="signupCoreVerifier" placeholder="e.g. My Mother, My Family" autocomplete="off" maxlength="80">
+        <div style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.45; margin-top: 4px; padding: 7px 11px; background: rgba(99, 102, 241, 0.15); border-radius: 9px; border-left: 3px solid #818cf8;">
+          🌸 <em>This will be a very important piece of information when recovering your account — whether you forgot your password or your account is compromised. Please take note of this answer. Don't share it with anyone.</em>
+        </div>
+        <div class="field-error" id="coreVerifierError"></div>
+      </div>
+
       <button type="submit" class="btn-submit" id="btnSignupText">Create My Account & Continue →</button>
     </form>
 
@@ -416,6 +425,26 @@
     }
 
     // -------------------------------------------------------------
+    // Core Verifier validation:
+    // - Letters and spaces only (a-z, A-Z, spaces).
+    // - No numbers or special characters.
+    // - Limit up to 80 characters.
+    // -------------------------------------------------------------
+    function validateCoreVerifier(value) {
+      const verifier = (value || '').trim();
+      if (!verifier) {
+        return "Please tell us who you love the most — this keeps your account safe!";
+      }
+      if (verifier.length > 80) {
+        return "Answer cannot exceed 80 characters.";
+      }
+      if (!/^[a-zA-Z\s]+$/.test(verifier)) {
+        return "Please use letters and spaces only (no numbers or special characters).";
+      }
+      return "";
+    }
+
+    // -------------------------------------------------------------
     // Attach Blur and Input Listeners
     // -------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", () => {
@@ -494,6 +523,19 @@
           setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
         }
       });
+
+      // Core Verifier events
+      const coreVerifierInput = document.getElementById("signupCoreVerifier");
+      if (coreVerifierInput) {
+        coreVerifierInput.addEventListener("blur", () => {
+          setFieldError("signupCoreVerifier", "coreVerifierError", validateCoreVerifier(coreVerifierInput.value));
+        });
+        coreVerifierInput.addEventListener("input", () => {
+          if (coreVerifierInput.classList.contains("is-invalid")) {
+            setFieldError("signupCoreVerifier", "coreVerifierError", validateCoreVerifier(coreVerifierInput.value));
+          }
+        });
+      }
     });
 
     // -------------------------------------------------------------
@@ -507,6 +549,7 @@
       const emailInput = document.getElementById("signupEmail");
       const passwordInput = document.getElementById("signupPassword");
       const confirmInput = document.getElementById("signupConfirmPassword");
+      const coreVerifierInput = document.getElementById("signupCoreVerifier");
       const topErrorEl = document.getElementById("signupError");
       const btn = document.getElementById("btnSignupText");
 
@@ -519,20 +562,23 @@
       const emailErr = validateEmail(emailInput.value);
       const passwordErr = validatePassword(passwordInput.value);
       const confirmErr = validateConfirmPassword(confirmInput.value, passwordInput.value);
+      const coreVerifierErr = validateCoreVerifier(coreVerifierInput ? coreVerifierInput.value : '');
 
       setFieldError("signupName", "nameError", nameErr);
       setFieldError("signupUsername", "usernameError", usernameErr);
       setFieldError("signupEmail", "emailError", emailErr);
       setFieldError("signupPassword", "passwordError", passwordErr);
       setFieldError("signupConfirmPassword", "confirmPasswordError", confirmErr);
+      setFieldError("signupCoreVerifier", "coreVerifierError", coreVerifierErr);
 
       // Block account creation if any field is invalid
-      if (nameErr || usernameErr || emailErr || passwordErr || confirmErr) {
+      if (nameErr || usernameErr || emailErr || passwordErr || confirmErr || coreVerifierErr) {
         if (nameErr) nameInput.focus();
         else if (usernameErr) usernameInput.focus();
         else if (emailErr) emailInput.focus();
         else if (passwordErr) passwordInput.focus();
         else if (confirmErr) confirmInput.focus();
+        else if (coreVerifierErr && coreVerifierInput) coreVerifierInput.focus();
         return;
       }
 
@@ -544,13 +590,20 @@
           nameInput.value.trim(),
           usernameInput.value.trim(),
           emailInput.value.trim(),
-          passwordInput.value
+          passwordInput.value,
+          coreVerifierInput ? coreVerifierInput.value.trim() : ''
         );
         // On success, redirect to /rules.html
         window.location.href = "/rules.html";
       } catch (err) {
         btn.disabled = false;
         btn.innerText = "Create My Account & Continue →";
+
+        if (err.field === 'coreVerifier') {
+          setFieldError("signupCoreVerifier", "coreVerifierError", err.message);
+          if (coreVerifierInput) coreVerifierInput.focus();
+          return;
+        }
 
         const errMsg = err.message || "Registration failed. Please try again.";
         if (errMsg.includes("already registered") || errMsg.includes("already taken")) {

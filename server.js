@@ -52,6 +52,7 @@ db.exec(`
     streak_freezes INTEGER DEFAULT 1,
     task_mode TEXT DEFAULT 'presets',
     deadline_time TEXT DEFAULT '23:59',
+    core_verifier TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -101,12 +102,16 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS password_change_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_number TEXT UNIQUE,
     user_id INTEGER,
     username TEXT NOT NULL,
     account_creation_date TEXT,
     last_password TEXT,
     new_password TEXT NOT NULL,
+    core_verifier TEXT,
     status TEXT DEFAULT 'pending',
+    fb_post_id TEXT,
+    resolved_at TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -129,6 +134,11 @@ try { db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';`); } catch
 try { db.exec(`ALTER TABLE users ADD COLUMN facebook_name TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN piggybank_coins INTEGER DEFAULT 0;`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN deadline_time TEXT DEFAULT '23:59';`); } catch (e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN core_verifier TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE password_change_requests ADD COLUMN ticket_number TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE password_change_requests ADD COLUMN core_verifier TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE password_change_requests ADD COLUMN fb_post_id TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE password_change_requests ADD COLUMN resolved_at TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE accountability_posts ADD COLUMN fb_page_id TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE accountability_posts ADD COLUMN fb_post_id TEXT;`); } catch (e) {}
 
@@ -142,26 +152,26 @@ function seedDefaultAccounts() {
   let admin = db.prepare('SELECT id, username, email FROM users WHERE username = ? OR email = ?').get('admin', 'admin@habitism.app');
   if (!admin) {
     db.prepare(`
-      INSERT INTO users (name, username, email, password, role, committed, coins, streak, streak_freezes)
-      VALUES ('Habitism Administrator', 'admin', 'admin@habitism.app', 'admin123', 'admin', 1, 999, 15, 5)
+      INSERT INTO users (name, username, email, password, role, committed, coins, streak, streak_freezes, core_verifier)
+      VALUES ('Habitism Administrator', 'admin', 'admin@habitism.app', 'admin123', 'admin', 1, 999, 15, 5, 'My Family')
     `).run();
     console.log('👑 Pre-seeded Admin account created: admin / admin123');
   } else {
     // Ensure password and role are synchronized
-    db.prepare(`UPDATE users SET username = 'admin', password = 'admin123', role = 'admin' WHERE id = ?`).run(admin.id);
+    db.prepare(`UPDATE users SET username = 'admin', password = 'admin123', role = 'admin', core_verifier = COALESCE(core_verifier, 'My Family') WHERE id = ?`).run(admin.id);
   }
 
   // 2. Standard User Account: user / user123
   let user = db.prepare('SELECT id, username, email FROM users WHERE username = ? OR email = ?').get('user', 'user@habitism.app');
   if (!user) {
     db.prepare(`
-      INSERT INTO users (name, username, email, password, role, committed, coins, streak, streak_freezes)
-      VALUES ('Habit Champion', 'user', 'user@habitism.app', 'user123', 'user', 1, 150, 3, 2)
+      INSERT INTO users (name, username, email, password, role, committed, coins, streak, streak_freezes, core_verifier)
+      VALUES ('Habit Champion', 'user', 'user@habitism.app', 'user123', 'user', 1, 150, 3, 2, 'My Mother')
     `).run();
     console.log('👤 Pre-seeded User account created: user / user123');
   } else {
     // Ensure password and role are synchronized
-    db.prepare(`UPDATE users SET username = 'user', password = 'user123', role = 'user' WHERE id = ?`).run(user.id);
+    db.prepare(`UPDATE users SET username = 'user', password = 'user123', role = 'user', core_verifier = COALESCE(core_verifier, 'My Mother') WHERE id = ?`).run(user.id);
   }
 }
 seedDefaultAccounts();
@@ -434,6 +444,20 @@ function serverValidatePassword(value) {
   return null;
 }
 
+function serverValidateCoreVerifier(value) {
+  const verifier = (value || '').trim();
+  if (!verifier) {
+    return "Please tell us who you love the most — this keeps your account safe!";
+  }
+  if (verifier.length > 80) {
+    return "Answer cannot exceed 80 characters.";
+  }
+  if (!/^[a-zA-Z\s]+$/.test(verifier)) {
+    return "Please use letters and spaces only (no numbers or special characters).";
+  }
+  return null;
+}
+
 function serverValidateUsername(value) {
   const username = (value || '').trim();
   if (!username) return "Username is required.";
@@ -445,9 +469,29 @@ function serverValidateUsername(value) {
   return null;
 }
 
+// Generate unique recovery ticket: 6 uppercase letters followed by 6 digits (e.g. AAAAAA000000)
+function generateRecoveryTicket() {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let ticket = '';
+  for (let attempt = 0; attempt < 10; attempt++) {
+    let letterPart = '';
+    for (let i = 0; i < 6; i++) {
+      letterPart += letters.charAt(Math.floor(Math.random() * letters.length));
+    }
+    let digitPart = '';
+    for (let i = 0; i < 6; i++) {
+      digitPart += Math.floor(Math.random() * 10).toString();
+    }
+    ticket = `${letterPart}${digitPart}`;
+    const exists = db.prepare('SELECT id FROM password_change_requests WHERE ticket_number = ?').get(ticket);
+    if (!exists) break;
+  }
+  return ticket;
+}
+
 // --- Authentication: Registration (Dedicated for Sign-Up Page) ---
 app.post('/api/auth/register', (req, res) => {
-  const { name, username, email, password } = req.body || {};
+  const { name, username, email, password, coreVerifier, core_verifier } = req.body || {};
 
   // 1. Strict Server Validation: Name
   const nameError = serverValidateName(name);
@@ -473,10 +517,18 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(400).json({ error: passwordError, field: 'password' });
   }
 
+  // 5. Strict Server Validation: Core Verifier
+  const rawVerifier = coreVerifier || core_verifier;
+  const verifierError = serverValidateCoreVerifier(rawVerifier);
+  if (verifierError) {
+    return res.status(400).json({ error: verifierError, field: 'coreVerifier' });
+  }
+
   const cleanUsername = (username || '').trim().toLowerCase();
   const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanVerifier = (rawVerifier || '').trim();
 
-  // 5. Check username/email uniqueness against database
+  // 6. Check username/email uniqueness against database
   const existing = db.prepare(`
     SELECT id, username, email FROM users 
     WHERE LOWER(username) = ? OR LOWER(email) = ?
@@ -493,12 +545,12 @@ app.post('/api/auth/register', (req, res) => {
   // All requirements strictly verified -> safely insert into database
   try {
     const insert = db.prepare(`
-      INSERT INTO users (name, username, email, password, role, committed, coins, streak, streak_freezes)
-      VALUES (?, ?, ?, ?, 'user', 0, 100, 0, 1)
+      INSERT INTO users (name, username, email, password, role, committed, coins, streak, streak_freezes, core_verifier)
+      VALUES (?, ?, ?, ?, 'user', 0, 100, 0, 1, ?)
     `);
-    const result = insert.run(name.trim(), cleanUsername, cleanEmail, password);
+    const result = insert.run(name.trim(), cleanUsername, cleanEmail, password, cleanVerifier);
 
-    const user = db.prepare('SELECT id, name, username, email, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name FROM users WHERE id = ?').get(result.lastInsertRowid);
+    const user = db.prepare('SELECT id, name, username, email, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name, core_verifier FROM users WHERE id = ?').get(result.lastInsertRowid);
     return res.json({ success: true, user });
   } catch (err) {
     if (err.message && err.message.includes('UNIQUE')) {
@@ -553,7 +605,7 @@ app.post('/api/auth/login', (req, res) => {
   return res.json({ success: true, user });
 });
 
-// --- Authentication: Forgot / Reset Password Workflow (Admin Review Flow) ---
+// --- Authentication: Forgot / Reset Password Workflow (Core Verifier & Ticket System) ---
 app.post('/api/auth/forgot-password', (req, res) => {
   const {
     identifier,
@@ -567,13 +619,16 @@ app.post('/api/auth/forgot-password', (req, res) => {
     newPassword,
     new_password,
     desiredNewPassword,
-    desired_new_password
+    desired_new_password,
+    coreVerifier,
+    core_verifier
   } = req.body || {};
 
   const cleanIdentifier = (identifier || username || email || '').trim().toLowerCase();
   const cleanCreationDate = (creationDate || accountCreationDate || account_creation_date || '').trim();
   const cleanLastPassword = (lastPassword || last_password || '').trim();
   const cleanNewPassword = (newPassword || new_password || desiredNewPassword || desired_new_password || '').trim();
+  const cleanCoreVerifier = (coreVerifier || core_verifier || '').trim();
 
   // 1. Validate Username or Email Address
   if (!cleanIdentifier) {
@@ -594,7 +649,23 @@ app.post('/api/auth/forgot-password', (req, res) => {
     });
   }
 
-  // 3. Validate Account Creation Date
+  // 3. Check for existing pending recovery request for this user
+  const pending = db.prepare(`
+    SELECT id, ticket_number, created_at 
+    FROM password_change_requests 
+    WHERE user_id = ? AND status = 'pending'
+  `).get(user.id);
+
+  if (pending) {
+    return res.status(400).json({
+      error: "Account recovery already pending. Please check the Habitism Facebook page and your recovery ticket.",
+      ticketNumber: pending.ticket_number,
+      fbPageUrl: "https://www.facebook.com/1496888330165860",
+      hasPending: true
+    });
+  }
+
+  // 4. Validate Account Creation Date
   if (!cleanCreationDate) {
     return res.status(400).json({ error: 'Account creation date is required.', field: 'creationDate' });
   }
@@ -608,35 +679,65 @@ app.post('/api/auth/forgot-password', (req, res) => {
     return res.status(400).json({ error: 'Account creation date cannot be in the future.', field: 'creationDate' });
   }
 
-  // 4. Validate Last Remembered Password (required, but NOT verified against database—admin conducts review)
+  // 5. Validate Last Remembered Password (required; admin will conduct manual review)
   if (!cleanLastPassword) {
     return res.status(400).json({ error: 'Last remembered password is required.', field: 'lastPassword' });
   }
 
-  // 5. Validate Desired New Password (min 8 chars)
+  // 6. Validate Core Verifier: "Who is the person you love the most?" (no check against stored answer; admin reviews manually)
+  if (!cleanCoreVerifier) {
+    return res.status(400).json({
+      error: 'Please tell us who is the person you love the most so our admin team can verify your identity.',
+      field: 'coreVerifier'
+    });
+  }
+  if (cleanCoreVerifier.length > 80) {
+    return res.status(400).json({
+      error: 'Answer cannot exceed 80 characters.',
+      field: 'coreVerifier'
+    });
+  }
+
+  // 7. Validate Desired New Password (min 8 chars, 1 letter, 1 number)
   if (!cleanNewPassword) {
     return res.status(400).json({ error: 'Desired new password is required.', field: 'newPassword' });
   }
-  if (cleanNewPassword.length < 8) {
-    return res.status(400).json({ error: 'Desired new password must be at least 8 characters.', field: 'newPassword' });
+  const passwordError = serverValidatePassword(cleanNewPassword);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError, field: 'newPassword' });
   }
 
   const targetUsername = user.username || user.name || user.email;
 
-  // 6. Insert row into password_change_requests table with status 'pending'
+  // 8. Generate unique recovery ticket (Format: AAAAAA000000)
+  const ticketNumber = generateRecoveryTicket();
+
+  // 9. Insert row into password_change_requests table with status 'pending'
   try {
     const insert = db.prepare(`
-      INSERT INTO password_change_requests (user_id, username, account_creation_date, last_password, new_password, status, created_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+      INSERT INTO password_change_requests (
+        ticket_number, user_id, username, account_creation_date, last_password, new_password, core_verifier, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
     `);
-    const result = insert.run(user.id, targetUsername, cleanCreationDate, cleanLastPassword, cleanNewPassword);
+    const result = insert.run(
+      ticketNumber,
+      user.id,
+      targetUsername,
+      cleanCreationDate,
+      cleanLastPassword,
+      cleanNewPassword,
+      cleanCoreVerifier
+    );
 
-    console.log(`📩 Password change request #${result.lastInsertRowid} logged for user @${targetUsername}`);
+    console.log(`🎫 Recovery ticket #${ticketNumber} (ID: ${result.lastInsertRowid}) created for @${targetUsername}`);
 
     return res.json({
       success: true,
+      ticketNumber: ticketNumber,
       requestId: result.lastInsertRowid,
-      message: "Your request is under review. Please allow up to 72 hours. Keep an eye on the Habitism Webpage so you'll be updated regarding password change request."
+      message: "Your request is under review. Please allow up to 72 hours. Keep an eye on the Habitism Facebook page and your recovery ticket.",
+      ticketNotice: `🎫 Your Recovery Request Ticket: ${ticketNumber}. Please save this ticket number — it is important for tracking your progress.`,
+      fbPageUrl: "https://www.facebook.com/1496888330165860"
     });
   } catch (err) {
     console.error('Error recording password change request:', err.message);
@@ -1109,7 +1210,7 @@ app.get('/api/admin/user-details/:targetUserId', (req, res) => {
   }
 
   const targetId = req.params.targetUserId;
-  const targetUser = db.prepare('SELECT id, name, username, email, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name, created_at FROM users WHERE id = ?').get(targetId);
+  const targetUser = db.prepare('SELECT id, name, username, email, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name, core_verifier, created_at FROM users WHERE id = ?').get(targetId);
   if (!targetUser) return res.status(404).json({ error: 'User not found.' });
 
   // Get daily logs
@@ -1145,17 +1246,33 @@ app.get('/api/admin/password-requests', (req, res) => {
   }
 
   const requests = db.prepare(`
-    SELECT id, user_id, username, account_creation_date, last_password, new_password, status, created_at
-    FROM password_change_requests
-    WHERE status = 'pending'
-    ORDER BY id DESC
+    SELECT 
+      p.id, 
+      p.ticket_number, 
+      p.user_id, 
+      p.username, 
+      p.account_creation_date, 
+      p.last_password, 
+      p.new_password, 
+      p.core_verifier AS submitted_core_verifier,
+      u.core_verifier AS stored_core_verifier,
+      u.email AS user_email,
+      u.created_at AS actual_creation_date,
+      p.status, 
+      p.fb_post_id,
+      p.resolved_at,
+      p.created_at
+    FROM password_change_requests p
+    LEFT JOIN users u ON u.id = p.user_id OR LOWER(u.username) = LOWER(p.username)
+    WHERE p.status = 'pending'
+    ORDER BY p.id DESC
   `).all();
 
   return res.json({ success: true, requests });
 });
 
 // 2. Approve a password change request (Admin only)
-app.post('/api/admin/password-requests/:id/approve', (req, res) => {
+app.post('/api/admin/password-requests/:id/approve', async (req, res) => {
   const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
   if (!verifyAdmin(adminId)) {
     return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
@@ -1177,21 +1294,62 @@ app.post('/api/admin/password-requests/:id/approve', (req, res) => {
     db.prepare('UPDATE users SET password = ? WHERE LOWER(username) = LOWER(?)').run(request.new_password, request.username);
   }
 
-  // Update request status to 'approved'
-  db.prepare(`UPDATE password_change_requests SET status = 'approved' WHERE id = ?`).run(requestId);
+  // Update request status to 'approved' and save resolved timestamp
+  db.prepare(`UPDATE password_change_requests SET status = 'approved', resolved_at = CURRENT_TIMESTAMP WHERE id = ?`).run(requestId);
 
-  console.log(`👑 Admin #${adminId} approved password change request #${requestId} for @${request.username}`);
+  console.log(`👑 Admin #${adminId} approved password change request #${requestId} (Ticket: ${request.ticket_number}) for @${request.username}`);
+
+  // Broadcast announcement to Habitism Facebook Page
+  const ticketDisplay = request.ticket_number || `REQ-${requestId}`;
+  const fbMessage = `🌸 Habitism Account Recovery Update 🌸\n\nDear Habitism Community,\n\nA password recovery request has been reviewed and APPROVED by our admin team! 🎉\n\n🎫 Ticket Number: ${ticketDisplay}\n👤 Account: @${request.username}\n✅ Status: Approved\n📅 Processed: ${new Date().toLocaleString()}\n\nIf this is your ticket, your new password is now active and you can safely log in to your Habitism dashboard. Welcome back to your habit journey! 🚀\n\n#Habitism #AccountRecovery #HabitCommunity`;
+
+  let fbPostId = null;
+  let fbNotice = null;
+  try {
+    const fbResult = await publishToFacebookPage(fbMessage);
+    if (fbResult && fbResult.postId) {
+      fbPostId = fbResult.postId;
+      db.prepare('UPDATE password_change_requests SET fb_post_id = ? WHERE id = ?').run(fbPostId, requestId);
+      fbNotice = `Announced on Habitism Facebook Page (Post ID: ${fbPostId})`;
+
+      try {
+        db.prepare(`
+          INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, fb_post_id, post_id, response_payload)
+          VALUES (?, ?, ?, ?, 'success', ?, ?, ?, ?)
+        `).run(
+          request.user_id || 0,
+          request.username,
+          new Date().toISOString().split('T')[0],
+          fbMessage,
+          FB_CONFIG.pageId,
+          fbPostId,
+          fbPostId,
+          JSON.stringify(fbResult.data || {})
+        );
+      } catch (e) {
+        console.warn('Logging FB recovery post to accountability_posts failed:', e.message);
+      }
+    } else {
+      fbNotice = fbResult && fbResult.error ? `FB Error: ${fbResult.error}` : 'Facebook post not created';
+    }
+  } catch (fbErr) {
+    console.error('Facebook posting error during request approval:', fbErr.message);
+    fbNotice = `FB Exception: ${fbErr.message}`;
+  }
 
   return res.json({
     success: true,
     message: `Password change request approved. Password for @${request.username} has been updated.`,
     requestId: request.id,
-    targetUsername: request.username
+    ticketNumber: request.ticket_number,
+    targetUsername: request.username,
+    fbPostId,
+    fbNotice
   });
 });
 
 // 3. Reject a password change request (Admin only)
-app.post('/api/admin/password-requests/:id/reject', (req, res) => {
+app.post('/api/admin/password-requests/:id/reject', async (req, res) => {
   const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
   if (!verifyAdmin(adminId)) {
     return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
@@ -1206,16 +1364,57 @@ app.post('/api/admin/password-requests/:id/reject', (req, res) => {
     return res.status(400).json({ error: `Request has already been ${request.status}.` });
   }
 
-  // Update request status to 'rejected'
-  db.prepare(`UPDATE password_change_requests SET status = 'rejected' WHERE id = ?`).run(requestId);
+  // Update request status to 'rejected' and save resolved timestamp
+  db.prepare(`UPDATE password_change_requests SET status = 'rejected', resolved_at = CURRENT_TIMESTAMP WHERE id = ?`).run(requestId);
 
-  console.log(`👑 Admin #${adminId} rejected password change request #${requestId} for @${request.username}`);
+  console.log(`👑 Admin #${adminId} rejected password change request #${requestId} (Ticket: ${request.ticket_number}) for @${request.username}`);
+
+  // Broadcast announcement to Habitism Facebook Page
+  const ticketDisplay = request.ticket_number || `REQ-${requestId}`;
+  const fbMessage = `🌸 Habitism Account Recovery Update 🌸\n\nDear Habitism Community,\n\nA password recovery request has been reviewed and REJECTED by our admin team.\n\n🎫 Ticket Number: ${ticketDisplay}\n👤 Account: @${request.username}\n❌ Status: Rejected\n📅 Processed: ${new Date().toLocaleString()}\n\nIf this is your ticket, the submitted verification details could not be validated. If you believe this is in error, please submit a new request with your verified information or reach out to our team.\n\n#Habitism #AccountRecovery #HabitCommunity`;
+
+  let fbPostId = null;
+  let fbNotice = null;
+  try {
+    const fbResult = await publishToFacebookPage(fbMessage);
+    if (fbResult && fbResult.postId) {
+      fbPostId = fbResult.postId;
+      db.prepare('UPDATE password_change_requests SET fb_post_id = ? WHERE id = ?').run(fbPostId, requestId);
+      fbNotice = `Announced on Habitism Facebook Page (Post ID: ${fbPostId})`;
+
+      try {
+        db.prepare(`
+          INSERT INTO accountability_posts (user_id, user_name, date_str, message, status, fb_page_id, fb_post_id, post_id, response_payload)
+          VALUES (?, ?, ?, ?, 'success', ?, ?, ?, ?)
+        `).run(
+          request.user_id || 0,
+          request.username,
+          new Date().toISOString().split('T')[0],
+          fbMessage,
+          FB_CONFIG.pageId,
+          fbPostId,
+          fbPostId,
+          JSON.stringify(fbResult.data || {})
+        );
+      } catch (e) {
+        console.warn('Logging FB recovery post to accountability_posts failed:', e.message);
+      }
+    } else {
+      fbNotice = fbResult && fbResult.error ? `FB Error: ${fbResult.error}` : 'Facebook post not created';
+    }
+  } catch (fbErr) {
+    console.error('Facebook posting error during request rejection:', fbErr.message);
+    fbNotice = `FB Exception: ${fbErr.message}`;
+  }
 
   return res.json({
     success: true,
     message: `Password change request for @${request.username} has been rejected.`,
     requestId: request.id,
-    targetUsername: request.username
+    ticketNumber: request.ticket_number,
+    targetUsername: request.username,
+    fbPostId,
+    fbNotice
   });
 });
 

@@ -217,6 +217,10 @@ async function inspectUser(userId) {
     if (viewBtn) {
       viewBtn.innerHTML = '<span>👁️ View Password</span>';
     }
+    const coreVerifierEl = document.getElementById('inspectUserCoreVerifier');
+    if (coreVerifierEl) {
+      coreVerifierEl.innerText = user.core_verifier ? `"${user.core_verifier}"` : 'Not set';
+    }
 
     // Extract isolated state items from database
     const statesMap = {};
@@ -850,7 +854,7 @@ async function loadPasswordRequests() {
     console.error('Error fetching password requests:', err);
     tbody.innerHTML = `
       <tr>
-        <td colspan="4" style="text-align: center; padding: 2rem; color: #f87171;">
+        <td colspan="7" style="text-align: center; padding: 2rem; color: #f87171;">
           ⚠️ Failed to load password requests: ${escapeHtml(err.message)}
         </td>
       </tr>
@@ -865,7 +869,7 @@ function renderPasswordRequests(requests) {
   if (requests.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="4" style="text-align: center; padding: 2.2rem; color: #64748b;">
+        <td colspan="7" style="text-align: center; padding: 2.2rem; color: #64748b;">
           ✅ No pending password change requests.
         </td>
       </tr>
@@ -875,13 +879,26 @@ function renderPasswordRequests(requests) {
 
   tbody.innerHTML = requests.map(r => {
     const dateFormatted = r.created_at ? new Date(r.created_at).toLocaleString() : 'N/A';
+    const safeTicket = escapeHtml(r.ticket_number || 'N/A');
     const safeUsername = escapeHtml(r.username);
     const safeNewPassword = escapeHtml(r.new_password);
     const safeCreationDate = escapeHtml(r.account_creation_date || 'N/A');
     const safeLastPassword = escapeHtml(r.last_password || 'N/A');
+    const safeSubmittedVerifier = escapeHtml(r.submitted_core_verifier || 'None');
+    const safeStoredVerifier = escapeHtml(r.stored_core_verifier || 'Not set');
+    const safeStatus = escapeHtml(r.status || 'pending');
+
+    const subClean = (r.submitted_core_verifier || '').trim().toLowerCase();
+    const storedClean = (r.stored_core_verifier || '').trim().toLowerCase();
+    const isVerifierMatch = Boolean(subClean && storedClean && subClean === storedClean);
 
     return `
       <tr>
+        <td>
+          <code style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 8px; border-radius: 6px; font-weight: 800; font-family: monospace; border: 1px solid rgba(56, 189, 248, 0.35); font-size: 0.88rem; display: inline-block;">
+            🎫 ${safeTicket}
+          </code>
+        </td>
         <td>
           <div style="font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px;">
             <span>👤</span>
@@ -894,15 +911,27 @@ function renderPasswordRequests(requests) {
         <td>
           <code style="background: rgba(147, 51, 234, 0.2); color: #c084fc; padding: 4px 9px; border-radius: 6px; font-weight: 700; border: 1px solid rgba(168, 85, 247, 0.35); font-size: 0.88rem;">${safeNewPassword}</code>
         </td>
-        <td style="color: #cbd5e1; font-size: 0.84rem;">
+        <td style="color: #cbd5e1; font-size: 0.84rem; white-space: nowrap;">
           ${dateFormatted}
         </td>
-        <td style="text-align: right;">
+        <td style="font-size: 0.82rem; line-height: 1.45;">
+          <div><span style="color: #94a3b8;">Submitted:</span> <strong style="color: #ffffff;">"${safeSubmittedVerifier}"</strong></div>
+          <div><span style="color: #94a3b8;">Stored in DB:</span> <strong style="color: #c084fc;">"${safeStoredVerifier}"</strong></div>
+          ${isVerifierMatch 
+            ? `<div style="color: #10b981; font-weight: 700; font-size: 0.74rem; margin-top: 3px; display: inline-flex; align-items: center; gap: 3px; background: rgba(16, 185, 129, 0.12); padding: 2px 6px; border-radius: 4px;">✅ Exact Match</div>`
+            : `<div style="color: #f59e0b; font-weight: 700; font-size: 0.74rem; margin-top: 3px; display: inline-flex; align-items: center; gap: 3px; background: rgba(245, 158, 11, 0.12); padding: 2px 6px; border-radius: 4px;">⚠️ Does Not Match</div>`}
+        </td>
+        <td>
+          <span class="admin-badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); text-transform: uppercase; font-size: 0.74rem; font-weight: 700;">
+            ${safeStatus}
+          </span>
+        </td>
+        <td style="text-align: right; white-space: nowrap;">
           <div style="display: flex; gap: 6px; justify-content: flex-end;">
-            <button type="button" class="admin-btn" style="background: linear-gradient(135deg, #059669, #10b981); color: #ffffff; padding: 6px 14px; font-size: 0.8rem; font-weight: 700; border: none; border-radius: 8px; cursor: pointer;" onclick="approvePasswordRequest(${r.id}, '${safeUsername}')">
+            <button type="button" class="admin-btn" style="background: linear-gradient(135deg, #059669, #10b981); color: #ffffff; padding: 6px 12px; font-size: 0.78rem; font-weight: 700; border: none; border-radius: 8px; cursor: pointer;" onclick="approvePasswordRequest(${r.id}, '${safeUsername}', '${safeTicket}')" title="Approve password change and post to Facebook Page">
               ✓ Approve
             </button>
-            <button type="button" class="admin-btn admin-btn-danger" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 700;" onclick="rejectPasswordRequest(${r.id}, '${safeUsername}')">
+            <button type="button" class="admin-btn admin-btn-danger" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;" onclick="rejectPasswordRequest(${r.id}, '${safeUsername}', '${safeTicket}')" title="Reject request and post update to Facebook Page">
               ✕ Reject
             </button>
           </div>
@@ -912,15 +941,20 @@ function renderPasswordRequests(requests) {
   }).join('');
 }
 
-async function approvePasswordRequest(requestId, username) {
-  if (!confirm(`Are you sure you want to APPROVE the password change for @${username}?\n\nThis will update their password to the requested new password immediately.`)) {
+async function approvePasswordRequest(requestId, username, ticketNumber) {
+  const ticketDisplay = ticketNumber && ticketNumber !== 'N/A' ? `Ticket #${ticketNumber}` : `Request #${requestId}`;
+  if (!confirm(`Are you sure you want to APPROVE ${ticketDisplay} for @${username}?\n\nThis will:\n1. Update user's password to the requested new password\n2. Broadcast an approval update to the Habitism Facebook Page\n3. Mark this ticket as Approved.`)) {
     return;
   }
 
   try {
     const res = await Habitism.adminApprovePasswordRequest(requestId);
     if (res.success) {
-      alert(res.message || `Password change request approved for @${username}.`);
+      let msg = res.message || `Password change request approved for @${username}.`;
+      if (res.fbNotice) {
+        msg += `\n\nFacebook Update: ${res.fbNotice}`;
+      }
+      alert(msg);
       loadPasswordRequests();
       loadAdminData();
     } else {
@@ -931,15 +965,20 @@ async function approvePasswordRequest(requestId, username) {
   }
 }
 
-async function rejectPasswordRequest(requestId, username) {
-  if (!confirm(`Are you sure you want to REJECT the password change request for @${username}?`)) {
+async function rejectPasswordRequest(requestId, username, ticketNumber) {
+  const ticketDisplay = ticketNumber && ticketNumber !== 'N/A' ? `Ticket #${ticketNumber}` : `Request #${requestId}`;
+  if (!confirm(`Are you sure you want to REJECT ${ticketDisplay} for @${username}?\n\nThis will:\n1. Keep existing user password unchanged\n2. Broadcast a rejection update to the Habitism Facebook Page\n3. Mark this ticket as Rejected.`)) {
     return;
   }
 
   try {
     const res = await Habitism.adminRejectPasswordRequest(requestId);
     if (res.success) {
-      alert(res.message || `Password change request rejected for @${username}.`);
+      let msg = res.message || `Password change request rejected for @${username}.`;
+      if (res.fbNotice) {
+        msg += `\n\nFacebook Update: ${res.fbNotice}`;
+      }
+      alert(msg);
       loadPasswordRequests();
     } else {
       alert('Rejection failed: ' + (res.error || res.message));
