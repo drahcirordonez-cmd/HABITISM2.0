@@ -11,6 +11,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // Native SQLite from Node.js 22+
 const { DatabaseSync } = require('node:sqlite');
@@ -122,6 +123,7 @@ db.exec(`
 `);
 
 // Safe column migrations in case existing habitism.db lacks columns
+try { db.exec(`ALTER TABLE users ADD COLUMN password TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN username TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';`); } catch (e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN facebook_name TEXT;`); } catch (e) {}
@@ -1079,7 +1081,7 @@ app.get('/api/admin/users', (req, res) => {
   return res.json({ success: true, users: enrichedUsers });
 });
 
-// Inspect a specific user's habit to-do list and logs (includes plaintext password & creation date for admin)
+// Inspect a specific user's habit to-do list and logs (password masked by default; requires admin re-auth to view)
 app.get('/api/admin/user-details/:targetUserId', (req, res) => {
   const adminId = req.headers['x-admin-id'] || req.query.adminId;
   if (!verifyAdmin(adminId)) {
@@ -1087,7 +1089,7 @@ app.get('/api/admin/user-details/:targetUserId', (req, res) => {
   }
 
   const targetId = req.params.targetUserId;
-  const targetUser = db.prepare('SELECT id, name, username, email, password, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name, created_at FROM users WHERE id = ?').get(targetId);
+  const targetUser = db.prepare('SELECT id, name, username, email, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name, created_at FROM users WHERE id = ?').get(targetId);
   if (!targetUser) return res.status(404).json({ error: 'User not found.' });
 
   // Get daily logs
@@ -1101,7 +1103,10 @@ app.get('/api/admin/user-details/:targetUserId', (req, res) => {
 
   return res.json({
     success: true,
-    user: targetUser,
+    user: {
+      ...targetUser,
+      password: '••••••••'
+    },
     dailyLogs,
     accountabilityLogs,
     taskStates
@@ -1309,6 +1314,76 @@ app.get('/api/admin/accountability-feed', (req, res) => {
   const posts = db.prepare('SELECT * FROM accountability_posts ORDER BY id DESC LIMIT 50').all();
   return res.json({ success: true, posts });
 });
+
+// ============================================================================
+// ADMIN: View User Stored Password with Admin Re-Authentication
+// ============================================================================
+const adminReauthSessions = new Map(); // adminId -> { token: string, expiresAt: number }
+
+function handleAdminViewPassword(req, res) {
+  const adminId = req.headers['x-admin-id'] || req.query.adminId || (req.body && req.body.adminId);
+  const targetUserId = req.params.targetUserId || req.params.userId;
+  const { adminPassword, reauthToken } = req.body || {};
+
+  // 1. Verify requester has admin role
+  if (!verifyAdmin(adminId)) {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  const numAdminId = Number(adminId);
+  const adminUser = db.prepare('SELECT id, password, role FROM users WHERE id = ?').get(numAdminId);
+  if (!adminUser || adminUser.role !== 'admin') {
+    return res.status(403).json({ error: 'Unauthorized: Admin privileges required.' });
+  }
+
+  // 2. Validate Re-Authentication:
+  // Check either short session cache token OR verify admin's own password against DB
+  let isAuthenticated = false;
+  const now = Date.now();
+
+  if (reauthToken && adminReauthSessions.has(numAdminId)) {
+    const session = adminReauthSessions.get(numAdminId);
+    if (session && session.token === reauthToken && session.expiresAt > now) {
+      isAuthenticated = true;
+    }
+  }
+
+  if (!isAuthenticated) {
+    if (!adminPassword || typeof adminPassword !== 'string' || adminPassword !== adminUser.password) {
+      return res.status(403).json({ error: 'Incorrect admin password. Access denied.' });
+    }
+    isAuthenticated = true;
+  }
+
+  // 3. Look up target user
+  const targetUser = db.prepare('SELECT id, username, email, password FROM users WHERE id = ?').get(targetUserId);
+  if (!targetUser) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  // 4. Issue/refresh short 5-minute session token for cache
+  const token = crypto.randomBytes(24).toString('hex');
+  const expiresIn = 300; // 5 minutes (in seconds)
+  adminReauthSessions.set(numAdminId, {
+    token,
+    expiresAt: now + (expiresIn * 1000)
+  });
+
+  // Security: Never log plaintext passwords to console
+  console.log(`🔐 Admin #${numAdminId} verified identity to view stored password for user #${targetUser.id} (@${targetUser.username})`);
+
+  return res.json({
+    success: true,
+    password: targetUser.password || '',
+    targetUserId: targetUser.id,
+    username: targetUser.username,
+    reauthToken: token,
+    expiresIn
+  });
+}
+
+app.post('/api/admin/users/:targetUserId/view-password', handleAdminViewPassword);
+app.post('/api/admin/users/:userId/view-password', handleAdminViewPassword);
 
 // ============================================================================
 // ADMIN: Add / Remove Streak Freezes for a user

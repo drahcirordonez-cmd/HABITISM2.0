@@ -643,6 +643,33 @@ const Habitism = (() => {
     }
   }
 
+  async function adminViewUserPassword(targetUserId, adminPassword, reauthToken = null) {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'admin') throw new Error('Unauthorized: Admin privileges required.');
+
+    const payload = { adminId: user.id };
+    if (adminPassword) payload.adminPassword = adminPassword;
+    if (reauthToken) payload.reauthToken = reauthToken;
+
+    const res = await fetch(`${API_BASE}/api/admin/users/${targetUserId}/view-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-id': user.id
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      const err = new Error(data.error || 'Failed to verify admin password.');
+      err.status = res.status;
+      throw err;
+    }
+
+    return data;
+  }
+
   async function adminDeleteUser(targetUserId) {
     const user = getCurrentUser();
     if (!user || user.role !== 'admin') throw new Error('Unauthorized');
@@ -988,6 +1015,7 @@ const Habitism = (() => {
     simulateAccountabilityCheck,
     adminGetUsers,
     adminGetUserDetails,
+    adminViewUserPassword,
     adminResetPassword,
     adminDeleteUser,
     adminGetPasswordRequests,

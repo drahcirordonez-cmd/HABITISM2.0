@@ -25,6 +25,7 @@ function initAdminDashboard() {
   loadPasswordRequests();
   loadFeedback();
   loadAccountabilityFeed();
+  updateReauthSessionIndicator();
 
   // Attach search listeners
   const searchInput = document.getElementById('userSearchInput');
@@ -162,6 +163,9 @@ function renderUsersTable(users) {
             <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="inspectUser(${u.id})">
               📋 Inspect To-Do
             </button>
+            <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="promptAdminPasswordForUser(${u.id}, '${escapeHtml(u.username || u.name)}')" title="Authenticate with admin password to view user credentials">
+              👁️ View Password
+            </button>
             <button type="button" class="admin-btn admin-btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;" onclick="openPasswordReset(${u.id}, '${escapeHtml(u.username)}')">
               🔑 Reset PW
             </button>
@@ -205,8 +209,13 @@ async function inspectUser(userId) {
       createdAtEl.innerText = user.created_at || 'Not recorded';
     }
     const passwordEl = document.getElementById('inspectUserPassword');
+    const viewBtn = document.getElementById('btnInspectViewPassword');
     if (passwordEl) {
-      passwordEl.innerText = user.password || 'Unavailable';
+      passwordEl.innerText = '••••••••';
+      passwordEl.style.color = '#94a3b8';
+    }
+    if (viewBtn) {
+      viewBtn.innerHTML = '<span>👁️ View Password</span>';
     }
 
     // Extract isolated state items from database
@@ -382,6 +391,204 @@ async function handleAdminPasswordSubmit(e) {
     msgEl.style.display = 'block';
   }
 }
+
+// ==========================================================================
+// Admin Re-Authentication & Password Viewing System
+// ==========================================================================
+let adminReauthSession = {
+  token: null,
+  expiresAt: 0
+};
+let currentPasswordRequestUserId = null;
+let currentPasswordRequestUsername = null;
+let revealedPasswordValue = null;
+
+function hasValidReauthSession() {
+  return adminReauthSession.token && Date.now() < adminReauthSession.expiresAt;
+}
+
+function updateReauthSessionIndicator() {
+  const lockBtn = document.getElementById('adminReauthLockBtn');
+  if (!lockBtn) return;
+  if (hasValidReauthSession()) {
+    const remainingMins = Math.max(1, Math.ceil((adminReauthSession.expiresAt - Date.now()) / 60000));
+    lockBtn.style.display = 'inline-flex';
+    lockBtn.innerHTML = `<span>🔓 Verified (${remainingMins}m) &bull; Lock</span>`;
+  } else {
+    lockBtn.style.display = 'none';
+  }
+}
+
+function clearAdminReauthSession() {
+  adminReauthSession.token = null;
+  adminReauthSession.expiresAt = 0;
+  updateReauthSessionIndicator();
+
+  // Mask inspect modal password if open
+  const inspectPw = document.getElementById('inspectUserPassword');
+  if (inspectPw) {
+    inspectPw.innerText = '••••••••';
+    inspectPw.style.color = '#94a3b8';
+  }
+  const inspectBtn = document.getElementById('btnInspectViewPassword');
+  if (inspectBtn) {
+    inspectBtn.innerHTML = '<span>👁️ View Password</span>';
+  }
+}
+
+async function promptAdminPasswordForUser(userId, username) {
+  currentPasswordRequestUserId = userId;
+  currentPasswordRequestUsername = username || `User #${userId}`;
+
+  // If already authenticated within session cache (valid for 5 minutes), fetch immediately!
+  if (hasValidReauthSession()) {
+    try {
+      const res = await Habitism.adminViewUserPassword(userId, null, adminReauthSession.token);
+      if (res && res.success) {
+        onPasswordRevealed(res.password, userId, currentPasswordRequestUsername);
+        return;
+      }
+    } catch (e) {
+      // Session expired or invalid, clear and proceed to prompt
+      clearAdminReauthSession();
+    }
+  }
+
+  // Show reauth prompt modal
+  const modal = document.getElementById('adminReauthModal');
+  const userText = document.getElementById('reauthTargetUserText');
+  const input = document.getElementById('adminReauthPasswordInput');
+  const errorMsg = document.getElementById('adminReauthErrorMsg');
+
+  if (userText) userText.innerText = `@${currentPasswordRequestUsername}`;
+  if (input) {
+    input.value = '';
+    setTimeout(() => input.focus(), 60);
+  }
+  if (errorMsg) {
+    errorMsg.style.display = 'none';
+    errorMsg.innerText = '';
+  }
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeAdminReauthModal() {
+  const modal = document.getElementById('adminReauthModal');
+  if (modal) modal.style.display = 'none';
+  const input = document.getElementById('adminReauthPasswordInput');
+  if (input) input.value = '';
+}
+
+async function handleAdminReauthSubmit(e) {
+  e.preventDefault();
+  const input = document.getElementById('adminReauthPasswordInput');
+  const errorMsg = document.getElementById('adminReauthErrorMsg');
+  const confirmBtn = document.getElementById('adminReauthConfirmBtn');
+
+  const adminPassword = (input?.value || '').trim();
+  if (!adminPassword) return;
+
+  confirmBtn.disabled = true;
+  confirmBtn.innerHTML = '<span>Verifying...</span>';
+
+  try {
+    const res = await Habitism.adminViewUserPassword(currentPasswordRequestUserId, adminPassword);
+    if (!res.success) throw new Error(res.error || 'Failed to verify admin password.');
+
+    // Save session cache (5 minutes)
+    if (res.reauthToken) {
+      adminReauthSession = {
+        token: res.reauthToken,
+        expiresAt: Date.now() + ((res.expiresIn || 300) * 1000)
+      };
+      updateReauthSessionIndicator();
+    }
+
+    closeAdminReauthModal();
+    onPasswordRevealed(res.password, currentPasswordRequestUserId, currentPasswordRequestUsername);
+  } catch (err) {
+    if (errorMsg) {
+      errorMsg.style.display = 'block';
+      errorMsg.innerText = err.message || 'Incorrect admin password. Access denied.';
+    }
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = '<span>Confirm</span>';
+  }
+}
+
+function onPasswordRevealed(password, userId, username) {
+  revealedPasswordValue = password;
+
+  // 1. If inspection modal is open for this user, reveal in inspection modal too
+  if (currentInspectUserId === userId) {
+    const pwEl = document.getElementById('inspectUserPassword');
+    if (pwEl) {
+      pwEl.innerText = password || '(Empty password)';
+      pwEl.style.color = '#34d399';
+    }
+    const btn = document.getElementById('btnInspectViewPassword');
+    if (btn) {
+      btn.innerHTML = '<span>🙈 Hide Password</span>';
+    }
+  }
+
+  // 2. Open revealed password modal
+  const modal = document.getElementById('revealedPasswordModal');
+  const userText = document.getElementById('revealedTargetUserText');
+  const display = document.getElementById('revealedPasswordDisplay');
+  const copyNotice = document.getElementById('revealedCopyNotice');
+
+  if (userText) userText.innerText = `@${username}`;
+  if (display) display.innerText = password || '(Empty password)';
+  if (copyNotice) copyNotice.style.display = 'none';
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function handleInspectViewPassword() {
+  if (!currentInspectUserId) return;
+  const pwEl = document.getElementById('inspectUserPassword');
+  const btn = document.getElementById('btnInspectViewPassword');
+
+  // If already revealed, toggle back to masked
+  if (pwEl && pwEl.innerText !== '••••••••' && pwEl.innerText !== '--') {
+    pwEl.innerText = '••••••••';
+    pwEl.style.color = '#94a3b8';
+    if (btn) btn.innerHTML = '<span>👁️ View Password</span>';
+    return;
+  }
+
+  promptAdminPasswordForUser(currentInspectUserId, currentInspectUsername);
+}
+
+function closeRevealedPasswordModal() {
+  const modal = document.getElementById('revealedPasswordModal');
+  if (modal) modal.style.display = 'none';
+  revealedPasswordValue = null;
+}
+
+async function copyRevealedPassword() {
+  if (!revealedPasswordValue) return;
+  try {
+    await navigator.clipboard.writeText(revealedPasswordValue);
+    const notice = document.getElementById('revealedCopyNotice');
+    if (notice) {
+      notice.style.display = 'block';
+      setTimeout(() => { notice.style.display = 'none'; }, 2500);
+    }
+  } catch (e) {
+    alert('Password: ' + revealedPasswordValue);
+  }
+}
+
+// Check session expiration periodically
+setInterval(updateReauthSessionIndicator, 30000);
 
 // ==========================================================================
 // Delete User
