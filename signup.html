@@ -136,6 +136,87 @@
       margin-bottom: 12px;
       display: none;
     }
+    .field-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-top: 3px;
+    }
+
+    .char-counter {
+      font-size: 0.76rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #94a3b8;
+      white-space: nowrap;
+      margin-left: auto;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.2s ease;
+      line-height: 1.2;
+      user-select: none;
+    }
+
+    .char-counter.is-warning {
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.16);
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .char-counter.is-exceeded {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.22);
+      border-color: rgba(239, 68, 68, 0.5);
+      font-weight: 700;
+      animation: counterPulse 0.3s ease-out;
+    }
+
+    @keyframes counterPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+      width: max-content;
+      max-width: 90vw;
+    }
+
+    .toast {
+      pointer-events: auto;
+      background: rgba(18, 14, 38, 0.94);
+      border: 1px solid rgba(239, 68, 68, 0.55);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.75), 0 0 25px rgba(239, 68, 68, 0.25);
+      color: #fecaca;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      animation: toastSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes toastSlideDown {
+      from { opacity: 0; transform: translateY(-16px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
   </style>
 </head>
 <body>
@@ -169,43 +250,117 @@
     </div>
 
     <form id="signupForm" novalidate onsubmit="handleSignupSubmit(event)">
+      <!-- Name: max 80 characters -->
       <div class="form-group">
         <label for="signupName">Full Name</label>
-        <input type="text" id="signupName" placeholder="e.g. John Doe" autocomplete="name" maxlength="80">
-        <div class="field-error" id="nameError"></div>
+        <input 
+          type="text" 
+          id="signupName" 
+          placeholder="e.g. John Doe" 
+          autocomplete="name" 
+          maxlength="120" 
+          data-max="80" 
+          aria-invalid="false" 
+          aria-describedby="nameError signupNameCounter">
+        <div class="field-footer">
+          <div class="field-error" id="nameError" role="alert" aria-live="polite"></div>
+          <span class="char-counter" id="signupNameCounter" aria-live="polite">0/80</span>
+        </div>
       </div>
 
+      <!-- Username: max 16 characters -->
       <div class="form-group">
         <label for="signupUsername">Username</label>
-        <input type="text" id="signupUsername" placeholder="e.g. johndoe (max 16, letters & numbers)" autocomplete="username" maxlength="16">
-        <div class="field-error" id="usernameError"></div>
+        <input 
+          type="text" 
+          id="signupUsername" 
+          placeholder="e.g. johndoe (max 16, letters & numbers)" 
+          autocomplete="username" 
+          maxlength="32" 
+          data-max="16" 
+          aria-invalid="false" 
+          aria-describedby="usernameError signupUsernameCounter">
+        <div class="field-footer">
+          <div class="field-error" id="usernameError" role="alert" aria-live="polite"></div>
+          <span class="char-counter" id="signupUsernameCounter" aria-live="polite">0/16</span>
+        </div>
       </div>
 
+      <!-- Email Address: max 254 characters -->
       <div class="form-group">
         <label for="signupEmail">Email Address</label>
-        <input type="email" id="signupEmail" placeholder="john@example.com" autocomplete="email" maxlength="254">
-        <div class="field-error" id="emailError"></div>
+        <input 
+          type="email" 
+          id="signupEmail" 
+          placeholder="john@example.com" 
+          autocomplete="email" 
+          maxlength="320" 
+          data-max="254" 
+          aria-invalid="false" 
+          aria-describedby="emailError signupEmailCounter">
+        <div class="field-footer">
+          <div class="field-error" id="emailError" role="alert" aria-live="polite"></div>
+          <span class="char-counter" id="signupEmailCounter" aria-live="polite">0/254</span>
+        </div>
       </div>
 
+      <!-- Password: max 64 characters -->
       <div class="form-group">
         <label for="signupPassword">Password</label>
-        <input type="password" id="signupPassword" placeholder="8-64 chars, min 1 letter & 1 number" autocomplete="new-password" minlength="8" maxlength="64">
-        <div class="field-error" id="passwordError"></div>
+        <input 
+          type="password" 
+          id="signupPassword" 
+          placeholder="8-64 chars, min 1 letter & 1 number" 
+          autocomplete="new-password" 
+          minlength="8" 
+          maxlength="100" 
+          data-max="64" 
+          aria-invalid="false" 
+          aria-describedby="passwordError signupPasswordCounter">
+        <div class="field-footer">
+          <div class="field-error" id="passwordError" role="alert" aria-live="polite"></div>
+          <span class="char-counter" id="signupPasswordCounter" aria-live="polite">0/64</span>
+        </div>
       </div>
 
+      <!-- Confirm Password: max 64 characters -->
       <div class="form-group">
         <label for="signupConfirmPassword">Confirm Password</label>
-        <input type="password" id="signupConfirmPassword" placeholder="Re-enter password" autocomplete="new-password" minlength="8" maxlength="64">
-        <div class="field-error" id="confirmPasswordError"></div>
+        <input 
+          type="password" 
+          id="signupConfirmPassword" 
+          placeholder="Re-enter password" 
+          autocomplete="new-password" 
+          minlength="8" 
+          maxlength="100" 
+          data-max="64" 
+          aria-invalid="false" 
+          aria-describedby="confirmPasswordError signupConfirmPasswordCounter">
+        <div class="field-footer">
+          <div class="field-error" id="confirmPasswordError" role="alert" aria-live="polite"></div>
+          <span class="char-counter" id="signupConfirmPasswordCounter" aria-live="polite">0/64</span>
+        </div>
       </div>
 
+      <!-- Person you love the most (Core Verifier): max 80 characters -->
       <div class="form-group">
         <label for="signupCoreVerifier">Who do you love the most?</label>
-        <input type="text" id="signupCoreVerifier" placeholder="e.g. My Mother, My Family" autocomplete="off" maxlength="80">
+        <input 
+          type="text" 
+          id="signupCoreVerifier" 
+          placeholder="e.g. My Mother, My Family" 
+          autocomplete="off" 
+          maxlength="120" 
+          data-max="80" 
+          aria-invalid="false" 
+          aria-describedby="coreVerifierError signupCoreVerifierCounter">
         <div style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.45; margin-top: 4px; padding: 7px 11px; background: rgba(99, 102, 241, 0.15); border-radius: 9px; border-left: 3px solid #818cf8;">
           🌸 <em>This will be a very important piece of information when recovering your account — whether you forgot your password or your account is compromised. Please take note of this answer. Don't share it with anyone.</em>
         </div>
-        <div class="field-error" id="coreVerifierError"></div>
+        <div class="field-footer">
+          <div class="field-error" id="coreVerifierError" role="alert" aria-live="polite"></div>
+          <span class="char-counter" id="signupCoreVerifierCounter" aria-live="polite">0/80</span>
+        </div>
       </div>
 
       <button type="submit" class="btn-submit" id="btnSignupText">Create My Account & Continue →</button>
@@ -220,93 +375,132 @@
   <script src="app.js?v=2.4"></script>
   <script>
     // -------------------------------------------------------------
-    // Inline Field Validation Helpers
+    // Inline Field Validation Helpers & Accessibility
     // -------------------------------------------------------------
+    function getCharLimitError(currentLength, maxLength) {
+      if (currentLength <= maxLength) return "";
+      const excess = currentLength - maxLength;
+      return `This field can have up to ${maxLength} characters. You've used ${currentLength}—please remove ${excess} character${excess === 1 ? '' : 's'}.`;
+    }
+
+    function updateCharCounter(inputEl, counterEl, maxLength) {
+      if (!inputEl || !counterEl) return 0;
+      const len = inputEl.value.length;
+      counterEl.innerText = `${len}/${maxLength}`;
+
+      if (len > maxLength) {
+        counterEl.classList.add("is-exceeded");
+        counterEl.classList.remove("is-warning");
+      } else if (len >= Math.floor(maxLength * 0.9)) {
+        counterEl.classList.remove("is-exceeded");
+        counterEl.classList.add("is-warning");
+      } else {
+        counterEl.classList.remove("is-exceeded");
+        counterEl.classList.remove("is-warning");
+      }
+      return len;
+    }
+
+    function showToast(message) {
+      let container = document.getElementById("toastContainer");
+      if (!container) {
+        container = document.createElement("div");
+        container.id = "toastContainer";
+        container.className = "toast-container";
+        container.setAttribute("role", "status");
+        container.setAttribute("aria-live", "polite");
+        document.body.appendChild(container);
+      }
+      container.innerHTML = "";
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.innerHTML = `<span style="font-size: 1.15rem; line-height: 1;">⚠️</span><span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(-10px)";
+        toast.style.transition = "all 0.3s ease";
+        setTimeout(() => {
+          if (toast.parentNode) toast.remove();
+        }, 300);
+      }, 4500);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
     function setFieldError(fieldId, errorId, errorMsg) {
       const input = document.getElementById(fieldId);
       const err = document.getElementById(errorId);
+      const counterId = `${fieldId}Counter`;
       if (!input || !err) return;
+
       if (errorMsg) {
         input.classList.add("is-invalid");
+        input.setAttribute("aria-invalid", "true");
+        input.setAttribute("aria-describedby", `${errorId} ${counterId}`);
         err.innerText = errorMsg;
         err.classList.add("visible");
       } else {
         input.classList.remove("is-invalid");
+        input.setAttribute("aria-invalid", "false");
+        input.setAttribute("aria-describedby", counterId);
         err.innerText = "";
         err.classList.remove("visible");
       }
     }
 
     // -------------------------------------------------------------
-    // Name field validation:
-    // - Limit: 80 characters.
-    // - Allowed: letters (a-z, A-Z), spaces, hyphens, apostrophes, periods.
-    // - Blocked: numbers, special characters (@#$% etc.).
+    // Field Validators (Format & Limits)
     // -------------------------------------------------------------
     function validateName(value) {
-      const name = (value || '').trim();
-      if (!name) {
+      const raw = value || '';
+      if (!raw.trim()) {
         return "Name is required.";
       }
-      if (name.length > 80) {
-        return "Name cannot exceed 80 characters.";
+      if (raw.length > 80) {
+        return getCharLimitError(raw.length, 80);
       }
       const allowedRegex = /^[a-zA-Z\s\-'.]+$/;
-      if (!allowedRegex.test(name) || !/[a-zA-Z]/.test(name)) {
+      if (!allowedRegex.test(raw.trim()) || !/[a-zA-Z]/.test(raw.trim())) {
         return "Name cannot contain numbers or special characters.";
       }
       return "";
     }
 
-    // -------------------------------------------------------------
-    // Username validation:
-    // - Limit: upto 16 characters (min 3).
-    // - Allowed: letters and numbers only (a-z, A-Z, 0-9).
-    // -------------------------------------------------------------
     function validateUsername(value) {
-      const username = (value || '').trim();
-      if (!username) {
+      const raw = value || '';
+      if (!raw.trim()) {
         return "Username is required.";
       }
-      if (username.length < 3) {
+      if (raw.length > 16) {
+        return getCharLimitError(raw.length, 16);
+      }
+      if (raw.trim().length < 3) {
         return "Username must be at least 3 characters.";
       }
-      if (username.length > 16) {
-        return "Username cannot exceed 16 characters.";
-      }
-      if (!/^[a-zA-Z0-9]+$/.test(username)) {
+      if (!/^[a-zA-Z0-9]+$/.test(raw.trim())) {
         return "Username can only contain letters and numbers.";
       }
       return "";
     }
 
-    // -------------------------------------------------------------
-    // Email field validation:
-    // - Trim leading/trailing whitespace.
-    // - No spaces allowed anywhere.
-    // - Restrict total length to 254 characters (RFC 5321).
-    // - Exactly one '@' symbol.
-    // - Local part: max 64 characters; cannot start/end with dot;
-    //   accept letters, numbers, dots, underscores, hyphens, plus (+).
-    // - Domain: must contain at least one dot (.).
-    // - Prevent consecutive dots (..).
-    // - Domain cannot start or end with a dot (.) or a hyphen (-).
-    // - Domain labels cannot start or end with hyphen.
-    // - Valid TLD (at least 2 letters, e.g. .com, .org).
-    // - Real-world provider compliant (Gmail, Outlook, Yahoo, etc.).
-    // -------------------------------------------------------------
     function validateEmail(value) {
       const raw = value === null || value === undefined ? '' : String(value);
-      const email = raw.trim();
-
-      if (!email) {
+      if (!raw.trim()) {
         return "Email address is required.";
       }
+      if (raw.length > 254) {
+        return getCharLimitError(raw.length, 254);
+      }
+
+      const email = raw.trim();
       if (/\s/.test(email)) {
         return "Email address cannot contain spaces.";
-      }
-      if (email.length > 254) {
-        return "Email address cannot exceed 254 characters.";
       }
       if (email.includes('..')) {
         return "Email address cannot contain consecutive dots ('..').";
@@ -328,7 +522,7 @@
         return "Email is missing a username before '@'.";
       }
       if (localPart.length > 64) {
-        return "The part before '@' cannot exceed 64 characters.";
+        return getCharLimitError(localPart.length, 64);
       }
       if (localPart.startsWith('.') || localPart.endsWith('.')) {
         return "The part before '@' cannot start or end with a dot.";
@@ -379,29 +573,19 @@
       return "";
     }
 
-    // -------------------------------------------------------------
-    // Password validation:
-    // - Required.
-    // - No spaces allowed.
-    // - Minimum length: 8 characters.
-    // - Maximum length: 64 characters.
-    // - Must contain at least 1 letter (a-z, A-Z).
-    // - Must contain at least 1 number (0-9).
-    // - Specific messages for each failed requirement.
-    // -------------------------------------------------------------
     function validatePassword(value) {
       const password = value === null || value === undefined ? '' : String(value);
       if (!password) {
         return "Password is required.";
+      }
+      if (password.length > 64) {
+        return getCharLimitError(password.length, 64);
       }
       if (/\s/.test(password)) {
         return "Password cannot contain spaces.";
       }
       if (password.length < 8) {
         return "Password must be at least 8 characters long.";
-      }
-      if (password.length > 64) {
-        return "Password cannot exceed 64 characters.";
       }
       if (!/[a-zA-Z]/.test(password)) {
         return "Password must contain at least one letter (a-z, A-Z).";
@@ -412,11 +596,13 @@
       return "";
     }
 
-    // Confirm Password validation: Must match password
     function validateConfirmPassword(confirmVal, passwordVal) {
       const confirm = confirmVal === null || confirmVal === undefined ? '' : String(confirmVal);
       if (!confirm) {
         return "Please confirm your password.";
+      }
+      if (confirm.length > 64) {
+        return getCharLimitError(confirm.length, 64);
       }
       if (confirm !== passwordVal) {
         return "Passwords do not match.";
@@ -424,47 +610,76 @@
       return "";
     }
 
-    // -------------------------------------------------------------
-    // Core Verifier validation:
-    // - Letters and spaces only (a-z, A-Z, spaces).
-    // - No numbers or special characters.
-    // - Limit up to 80 characters.
-    // -------------------------------------------------------------
     function validateCoreVerifier(value) {
-      const verifier = (value || '').trim();
-      if (!verifier) {
+      const raw = value || '';
+      if (!raw.trim()) {
         return "Please tell us who you love the most — this keeps your account safe!";
       }
-      if (verifier.length > 80) {
-        return "Answer cannot exceed 80 characters.";
+      if (raw.length > 80) {
+        return getCharLimitError(raw.length, 80);
       }
-      if (!/^[a-zA-Z\s]+$/.test(verifier)) {
+      if (!/^[a-zA-Z\s]+$/.test(raw.trim())) {
         return "Please use letters and spaces only (no numbers or special characters).";
       }
       return "";
     }
 
     // -------------------------------------------------------------
-    // Attach Blur and Input Listeners
+    // Attach Real-Time Blur and Input Listeners
     // -------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", () => {
       const nameInput = document.getElementById("signupName");
-      const usernameInput = document.getElementById("signupUsername");
-      const emailInput = document.getElementById("signupEmail");
-      const passwordInput = document.getElementById("signupPassword");
-      const confirmInput = document.getElementById("signupConfirmPassword");
+      const nameCounter = document.getElementById("signupNameCounter");
 
-      // Name events
+      const usernameInput = document.getElementById("signupUsername");
+      const usernameCounter = document.getElementById("signupUsernameCounter");
+
+      const emailInput = document.getElementById("signupEmail");
+      const emailCounter = document.getElementById("signupEmailCounter");
+
+      const passwordInput = document.getElementById("signupPassword");
+      const passwordCounter = document.getElementById("signupPasswordCounter");
+
+      const confirmInput = document.getElementById("signupConfirmPassword");
+      const confirmCounter = document.getElementById("signupConfirmPasswordCounter");
+
+      const coreVerifierInput = document.getElementById("signupCoreVerifier");
+      const coreVerifierCounter = document.getElementById("signupCoreVerifierCounter");
+
+      // Initialize all character counters
+      updateCharCounter(nameInput, nameCounter, 80);
+      updateCharCounter(usernameInput, usernameCounter, 16);
+      updateCharCounter(emailInput, emailCounter, 254);
+      updateCharCounter(passwordInput, passwordCounter, 64);
+      updateCharCounter(confirmInput, confirmCounter, 64);
+      if (coreVerifierInput) updateCharCounter(coreVerifierInput, coreVerifierCounter, 80);
+
+      // Name events (max 80)
+      nameInput.addEventListener("input", () => {
+        const len = updateCharCounter(nameInput, nameCounter, 80);
+        if (len > 80) {
+          setFieldError("signupName", "nameError", getCharLimitError(len, 80));
+        } else if (nameInput.classList.contains("is-invalid")) {
+          setFieldError("signupName", "nameError", validateName(nameInput.value));
+        } else {
+          setFieldError("signupName", "nameError", "");
+        }
+      });
       nameInput.addEventListener("blur", () => {
         setFieldError("signupName", "nameError", validateName(nameInput.value));
       });
-      nameInput.addEventListener("input", () => {
-        if (nameInput.classList.contains("is-invalid")) {
-          setFieldError("signupName", "nameError", validateName(nameInput.value));
+
+      // Username events (max 16)
+      usernameInput.addEventListener("input", () => {
+        const len = updateCharCounter(usernameInput, usernameCounter, 16);
+        if (len > 16) {
+          setFieldError("signupUsername", "usernameError", getCharLimitError(len, 16));
+        } else if (usernameInput.classList.contains("is-invalid")) {
+          setFieldError("signupUsername", "usernameError", validateUsername(usernameInput.value));
+        } else {
+          setFieldError("signupUsername", "usernameError", "");
         }
       });
-
-      // Username events
       usernameInput.addEventListener("blur", async () => {
         const err = validateUsername(usernameInput.value);
         setFieldError("signupUsername", "usernameError", err);
@@ -475,13 +690,18 @@
           }
         }
       });
-      usernameInput.addEventListener("input", () => {
-        if (usernameInput.classList.contains("is-invalid")) {
-          setFieldError("signupUsername", "usernameError", validateUsername(usernameInput.value));
+
+      // Email events (max 254)
+      emailInput.addEventListener("input", () => {
+        const len = updateCharCounter(emailInput, emailCounter, 254);
+        if (len > 254) {
+          setFieldError("signupEmail", "emailError", getCharLimitError(len, 254));
+        } else if (emailInput.classList.contains("is-invalid")) {
+          setFieldError("signupEmail", "emailError", validateEmail(emailInput.value));
+        } else {
+          setFieldError("signupEmail", "emailError", "");
         }
       });
-
-      // Email events
       emailInput.addEventListener("blur", async () => {
         const err = validateEmail(emailInput.value);
         setFieldError("signupEmail", "emailError", err);
@@ -492,48 +712,57 @@
           }
         }
       });
-      emailInput.addEventListener("input", () => {
-        if (emailInput.classList.contains("is-invalid")) {
-          setFieldError("signupEmail", "emailError", validateEmail(emailInput.value));
+
+      // Password events (max 64)
+      passwordInput.addEventListener("input", () => {
+        const len = updateCharCounter(passwordInput, passwordCounter, 64);
+        if (len > 64) {
+          setFieldError("signupPassword", "passwordError", getCharLimitError(len, 64));
+        } else if (passwordInput.classList.contains("is-invalid")) {
+          setFieldError("signupPassword", "passwordError", validatePassword(passwordInput.value));
+        } else {
+          setFieldError("signupPassword", "passwordError", "");
+        }
+        if (confirmInput.value && confirmInput.classList.contains("is-invalid")) {
+          setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
         }
       });
-
-      // Password events
       passwordInput.addEventListener("blur", () => {
         setFieldError("signupPassword", "passwordError", validatePassword(passwordInput.value));
         if (confirmInput.value) {
           setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
         }
       });
-      passwordInput.addEventListener("input", () => {
-        if (passwordInput.classList.contains("is-invalid")) {
-          setFieldError("signupPassword", "passwordError", validatePassword(passwordInput.value));
-        }
-        if (confirmInput.value && confirmInput.classList.contains("is-invalid")) {
+
+      // Confirm Password events (max 64)
+      confirmInput.addEventListener("input", () => {
+        const len = updateCharCounter(confirmInput, confirmCounter, 64);
+        if (len > 64) {
+          setFieldError("signupConfirmPassword", "confirmPasswordError", getCharLimitError(len, 64));
+        } else if (confirmInput.classList.contains("is-invalid")) {
           setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
+        } else {
+          setFieldError("signupConfirmPassword", "confirmPasswordError", "");
         }
       });
-
-      // Confirm Password events
       confirmInput.addEventListener("blur", () => {
         setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
       });
-      confirmInput.addEventListener("input", () => {
-        if (confirmInput.classList.contains("is-invalid")) {
-          setFieldError("signupConfirmPassword", "confirmPasswordError", validateConfirmPassword(confirmInput.value, passwordInput.value));
-        }
-      });
 
-      // Core Verifier events
-      const coreVerifierInput = document.getElementById("signupCoreVerifier");
+      // Core Verifier events (max 80)
       if (coreVerifierInput) {
+        coreVerifierInput.addEventListener("input", () => {
+          const len = updateCharCounter(coreVerifierInput, coreVerifierCounter, 80);
+          if (len > 80) {
+            setFieldError("signupCoreVerifier", "coreVerifierError", getCharLimitError(len, 80));
+          } else if (coreVerifierInput.classList.contains("is-invalid")) {
+            setFieldError("signupCoreVerifier", "coreVerifierError", validateCoreVerifier(coreVerifierInput.value));
+          } else {
+            setFieldError("signupCoreVerifier", "coreVerifierError", "");
+          }
+        });
         coreVerifierInput.addEventListener("blur", () => {
           setFieldError("signupCoreVerifier", "coreVerifierError", validateCoreVerifier(coreVerifierInput.value));
-        });
-        coreVerifierInput.addEventListener("input", () => {
-          if (coreVerifierInput.classList.contains("is-invalid")) {
-            setFieldError("signupCoreVerifier", "coreVerifierError", validateCoreVerifier(coreVerifierInput.value));
-          }
         });
       }
     });
@@ -573,6 +802,11 @@
 
       // Block account creation if any field is invalid
       if (nameErr || usernameErr || emailErr || passwordErr || confirmErr || coreVerifierErr) {
+        // Show summary toast
+        showToast("Please fix the highlighted fields before creating your account.");
+        topErrorEl.innerText = "Please fix the highlighted fields before creating your account.";
+        topErrorEl.style.display = "block";
+
         if (nameErr) nameInput.focus();
         else if (usernameErr) usernameInput.focus();
         else if (emailErr) emailInput.focus();

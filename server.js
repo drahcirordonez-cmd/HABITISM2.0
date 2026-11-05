@@ -372,10 +372,15 @@ Discipline Penalty: Daily streak has been broken and reset to 0 days.
 // STRICT SERVER-SIDE VALIDATION HELPERS
 // Ensures invalid inputs can NEVER be saved into the database.
 // ============================================================================
+function serverCharLimitMessage(currentLength, maxLength) {
+  const excess = currentLength - maxLength;
+  return `This field can have up to ${maxLength} characters. You've used ${currentLength}—please remove ${excess} character${excess === 1 ? '' : 's'}.`;
+}
+
 function serverValidateName(value) {
   const name = (value || '').trim();
   if (!name) return "Name is required.";
-  if (name.length > 80) return "Name cannot exceed 80 characters.";
+  if (name.length > 80) return serverCharLimitMessage(name.length, 80);
   const allowedRegex = /^[a-zA-Z\s\-'.]+$/;
   if (!allowedRegex.test(name) || !/[a-zA-Z]/.test(name)) {
     return "Name cannot contain numbers or special characters.";
@@ -388,8 +393,8 @@ function serverValidateEmail(value) {
   const email = raw.trim();
 
   if (!email) return "Email address is required.";
+  if (email.length > 254) return serverCharLimitMessage(email.length, 254);
   if (/\s/.test(email)) return "Email address cannot contain spaces.";
-  if (email.length > 254) return "Email address cannot exceed 254 characters.";
   if (email.includes('..')) return "Email address cannot contain consecutive dots ('..').";
 
   const atMatches = email.match(/@/g);
@@ -401,7 +406,7 @@ function serverValidateEmail(value) {
   const domain = email.slice(atIndex + 1);
 
   if (!localPart) return "Email is missing a username before '@'.";
-  if (localPart.length > 64) return "The part before '@' cannot exceed 64 characters.";
+  if (localPart.length > 64) return serverCharLimitMessage(localPart.length, 64);
   if (localPart.startsWith('.') || localPart.endsWith('.')) return "The part before '@' cannot start or end with a dot.";
   if (!/^[a-zA-Z0-9._+-]+$/.test(localPart)) {
     return "The part before '@' can only contain letters, numbers, dots, underscores, hyphens, or '+'.";
@@ -436,9 +441,9 @@ function serverValidateEmail(value) {
 function serverValidatePassword(value) {
   const password = value === null || value === undefined ? '' : String(value);
   if (!password) return "Password is required.";
+  if (password.length > 64) return serverCharLimitMessage(password.length, 64);
   if (/\s/.test(password)) return "Password cannot contain spaces.";
   if (password.length < 8) return "Password must be at least 8 characters long.";
-  if (password.length > 64) return "Password cannot exceed 64 characters.";
   if (!/[a-zA-Z]/.test(password)) return "Password must contain at least one letter (a-z, A-Z).";
   if (!/[0-9]/.test(password)) return "Password must contain at least one number (0-9).";
   return null;
@@ -450,7 +455,7 @@ function serverValidateCoreVerifier(value) {
     return "Please tell us who you love the most — this keeps your account safe!";
   }
   if (verifier.length > 80) {
-    return "Answer cannot exceed 80 characters.";
+    return serverCharLimitMessage(verifier.length, 80);
   }
   if (!/^[a-zA-Z\s]+$/.test(verifier)) {
     return "Please use letters and spaces only (no numbers or special characters).";
@@ -461,8 +466,8 @@ function serverValidateCoreVerifier(value) {
 function serverValidateUsername(value) {
   const username = (value || '').trim();
   if (!username) return "Username is required.";
+  if (username.length > 16) return serverCharLimitMessage(username.length, 16);
   if (username.length < 3) return "Username must be at least 3 characters.";
-  if (username.length > 16) return "Username cannot exceed 16 characters.";
   if (!/^[a-zA-Z0-9]+$/.test(username)) {
     return "Username can only contain letters and numbers.";
   }
