@@ -98,3 +98,4 @@ Located in the **💬 User Feedback** panel (`#userFeedbackPanel`).
 - **Protected Password Reveal**: Viewing a user's stored password (`POST /api/admin/users/:targetUserId/view-password`) requires the administrator to re-enter their own admin password in the **Confirm Admin Identity** modal.
 - **5-Minute Verified Session**: Once verified, an active re-authentication session is cached for **5 minutes** (indicated by the green `🔓 Verified (5m) • Lock` badge in the top navbar). Click the badge at any time to immediately lock the session.
 - **Role Enforcement**: Every `/api/admin/*` backend route strictly verifies `role === 'admin'` before executing any read or write operation.
+
