@@ -964,6 +964,165 @@ try {
   }
 } catch (e) {}
 
+// Helper: Normalize any date string (ISO YYYY-MM-DD or toDateString) into standard toDateString
+function normalizeDateStr(dateStr) {
+  if (!dateStr) return '';
+  const str = String(dateStr).trim();
+  const d = str.includes('-') && str.length === 10
+    ? new Date(str + 'T12:00:00')
+    : new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toDateString();
+  }
+  return str;
+}
+
+function countTruthyCheckEntries(val) {
+  if (!val) return 0;
+  try {
+    const obj = typeof val === 'string' ? JSON.parse(val) : val;
+    if (!obj || typeof obj !== 'object') return 0;
+    return Object.values(obj).filter(Boolean).length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// Compute the effective completed habit count for a user on a given date from `user_task_states`
+function getDerivedCheckCountForDate(userId, targetDateStr) {
+  const normDate = normalizeDateStr(targetDateStr);
+  if (!userId || !normDate) return 0;
+
+  const rows = db.prepare(`
+    SELECT state_key, state_value
+    FROM user_task_states
+    WHERE user_id = ? AND state_key LIKE ?
+  `).all(userId, `%_${normDate}`);
+
+  if (!rows || rows.length === 0) return 0;
+
+  const map = {};
+  for (const r of rows) {
+    try {
+      map[r.state_key] = JSON.parse(r.state_value);
+    } catch (e) {
+      map[r.state_key] = r.state_value;
+    }
+  }
+
+  let committedCount = 0;
+  const commitObj = map[`commitment_${normDate}`];
+  if (commitObj && commitObj.listId) {
+    if (commitObj.listId === 'custom') {
+      committedCount = countTruthyCheckEntries(map[`custom_checks_${normDate}`]);
+    } else {
+      const lvlId = String(commitObj.listId).replace('lvl_', '');
+      committedCount = Math.max(
+        countTruthyCheckEntries(map[`checks_${lvlId}_${normDate}`]),
+        countTruthyCheckEntries(map[`checks_lvl_${lvlId}_${normDate}`])
+      );
+    }
+  }
+
+  let maxListCount = countTruthyCheckEntries(map[`custom_checks_${normDate}`]);
+  for (let lvl = 1; lvl <= 5; lvl++) {
+    const c1 = countTruthyCheckEntries(map[`checks_${lvl}_${normDate}`]);
+    const c2 = countTruthyCheckEntries(map[`checks_lvl_${lvl}_${normDate}`]);
+    if (c1 > maxListCount) maxListCount = c1;
+    if (c2 > maxListCount) maxListCount = c2;
+  }
+
+  const lockObj = map[`claim_lock_${normDate}`];
+  if (lockObj && typeof lockObj === 'object') {
+    for (const listLocks of Object.values(lockObj)) {
+      const c = countTruthyCheckEntries(listLocks);
+      if (c > maxListCount) maxListCount = c;
+    }
+  }
+
+  return committedCount > 0 ? committedCount : maxListCount;
+}
+
+// Reconcile all historical and current checkmarks in `user_task_states` into `daily_logs`
+function reconcileUserCalendarFromTaskStates(userId) {
+  if (!userId) return;
+  try {
+    const rows = db.prepare('SELECT state_key FROM user_task_states WHERE user_id = ?').all(userId);
+    const dates = new Set();
+    for (const r of rows) {
+      const m = String(r.state_key).match(/^(?:checks_(?:lvl_)?\d+|custom_checks|claim_lock|commitment)_(.+)$/);
+      if (m && m[1]) {
+        const norm = normalizeDateStr(m[1]);
+        if (norm) dates.add(norm);
+      }
+    }
+
+    for (const dateStr of dates) {
+      const derivedCount = getDerivedCheckCountForDate(userId, dateStr);
+      if (derivedCount <= 0) continue;
+
+      const existing = db.prepare('SELECT completed_count, total_count, status FROM daily_logs WHERE user_id = ? AND date_str = ?').get(userId, dateStr);
+      // Do not overwrite an explicit admin "incomplete" override unless derivedCount > 0 and no row exists
+      if (!existing || (existing.status !== 'incomplete' && (existing.completed_count || 0) < derivedCount)) {
+        const total = existing && existing.total_count ? Math.max(existing.total_count, derivedCount) : Math.max(5, derivedCount);
+        const status = derivedCount >= 5 ? 'completed' : 'in_progress';
+        db.prepare(`
+          INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, date_str) DO UPDATE SET
+            completed_count = excluded.completed_count,
+            total_count = excluded.total_count,
+            status = excluded.status
+        `).run(userId, dateStr, derivedCount, total, status);
+      }
+    }
+  } catch (err) {
+    console.warn('Warning reconciling calendar from task states:', err.message);
+  }
+}
+
+// Check if a dateStr is valid "today" (accounting for Asia/Manila & client timezones) or a valid checkmark reconciliation
+function isAllowedUserCalendarSave(userId, dateStr, normalizedDate, count) {
+  const tz = process.env.TIMEZONE || process.env.TZ || 'Asia/Manila';
+  const manilaTodayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toDateString();
+  const utcTodayStr = new Date().toDateString();
+
+  if (
+    dateStr === utcTodayStr ||
+    normalizedDate === utcTodayStr ||
+    dateStr === manilaTodayStr ||
+    normalizedDate === manilaTodayStr
+  ) {
+    return true;
+  }
+
+  // Allow within +/- 36 hours of current time to support all local client timezones around midnight
+  const parsed = new Date(normalizedDate);
+  if (!isNaN(parsed.getTime())) {
+    const diffHours = Math.abs(Date.now() - parsed.getTime()) / (1000 * 60 * 60);
+    if (diffHours <= 36) return true;
+  }
+
+  // Also allow backfilling a past date when syncing positive completed checkmarks that aren't admin-locked
+  const numCount = parseInt(count, 10) || 0;
+  if (numCount > 0) {
+    const derived = getDerivedCheckCountForDate(userId, normalizedDate);
+    if (derived > 0) return true;
+    const existing = db.prepare('SELECT status FROM daily_logs WHERE user_id = ? AND date_str = ?').get(userId, normalizedDate);
+    if (!existing) return true;
+  }
+
+  return false;
+}
+
+// Reconcile any existing task states into `daily_logs` on startup
+try {
+  const allUsers = db.prepare('SELECT id FROM users').all();
+  for (const u of allUsers) {
+    reconcileUserCalendarFromTaskStates(u.id);
+  }
+} catch (e) {}
+
 // --- Multi-User State Synchronization ---
 app.post('/api/user/state/save', (req, res) => {
   const { userId, stateKey, stateValue } = req.body;
@@ -982,6 +1141,27 @@ app.post('/api/user/state/save', (req, res) => {
     syncUserHabitsTable(userId, stateKey, stateValue);
   }
 
+  // Automatically keep `daily_logs` synchronized whenever checkmarks or commitments are saved
+  const dateMatch = String(stateKey).match(/^(?:checks_(?:lvl_)?\d+|custom_checks|claim_lock|commitment)_(.+)$/);
+  if (dateMatch && dateMatch[1]) {
+    const normDate = normalizeDateStr(dateMatch[1]);
+    if (normDate) {
+      const derivedCount = getDerivedCheckCountForDate(userId, normDate);
+      const status = derivedCount >= 5 ? 'completed' : (derivedCount > 0 ? 'in_progress' : 'empty');
+      if (derivedCount <= 0) {
+        db.prepare("DELETE FROM daily_logs WHERE user_id = ? AND date_str = ? AND status != 'incomplete'").run(userId, normDate);
+      } else {
+        db.prepare(`
+          INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, date_str) DO UPDATE SET
+            completed_count = excluded.completed_count,
+            status = excluded.status
+        `).run(userId, normDate, derivedCount, Math.max(5, derivedCount), status);
+      }
+    }
+  }
+
   return res.json({ success: true });
 });
 
@@ -993,19 +1173,6 @@ app.get('/api/user/state/get/:userId/:stateKey', (req, res) => {
 
 // --- Calendar & Full State Persistence Across Browsers ---
 
-// Helper: Normalize any date string (ISO YYYY-MM-DD or toDateString) into standard toDateString
-function normalizeDateStr(dateStr) {
-  if (!dateStr) return '';
-  const str = String(dateStr).trim();
-  const d = str.includes('-') && str.length === 10
-    ? new Date(str + 'T12:00:00')
-    : new Date(str);
-  if (!isNaN(d.getTime())) {
-    return d.toDateString();
-  }
-  return str;
-}
-
 // 1. Set Calendar Day count (read-only for non-admins except today's checklist; admins can modify any date)
 app.post('/api/user/calendar/set-day', (req, res) => {
   const { userId, dateStr, count } = req.body;
@@ -1015,15 +1182,22 @@ app.post('/api/user/calendar/set-day', (req, res) => {
   const isAdmin = verifyAdmin(adminId);
 
   const normalizedDate = normalizeDateStr(dateStr);
-  const todayStr = new Date().toDateString();
-  const isToday = (dateStr === todayStr || normalizedDate === todayStr);
+  const isAllowedDate = isAllowedUserCalendarSave(userId, dateStr, normalizedDate, count);
 
-  // Frontend and backend guard: non-admins cannot modify past or future calendar dates
-  if (!isAdmin && !isToday) {
+  // Frontend and backend guard: non-admins cannot modify arbitrary past or future calendar dates
+  if (!isAdmin && !isAllowedDate) {
     return res.status(403).json({ error: 'Only admins can modify calendar dates.' });
   }
 
-  const completedCount = parseInt(count, 10) || 0;
+  let completedCount = parseInt(count, 10) || 0;
+  // Never wipe a day's log to 0 if the user still has positive saved checkmarks for that date
+  if (!isAdmin && completedCount <= 0) {
+    const derived = getDerivedCheckCountForDate(userId, normalizedDate);
+    if (derived > 0) {
+      completedCount = derived;
+    }
+  }
+
   const status = completedCount >= 5 ? 'completed' : (completedCount > 0 ? 'in_progress' : 'empty');
 
   if (completedCount <= 0) {
@@ -1053,6 +1227,7 @@ INSERT INTO daily_logs (user_id, date_str, completed_count, total_count, status)
 // 2. Get User's Entire Calendar History
 app.get('/api/user/calendar/:userId', (req, res) => {
   const userId = req.params.userId;
+  reconcileUserCalendarFromTaskStates(userId);
   const rows = db.prepare('SELECT date_str, completed_count, total_count, status FROM daily_logs WHERE user_id = ?').all(userId);
 
   const calendarMap = {};
@@ -1077,6 +1252,8 @@ app.get('/api/user/full-state/:userId', (req, res) => {
   `).get(userId);
 
   if (!user) return res.status(404).json({ error: 'User not found' });
+
+  reconcileUserCalendarFromTaskStates(userId);
 
   // All daily logs for calendar
   const dailyLogs = db.prepare('SELECT date_str, completed_count, total_count, status FROM daily_logs WHERE user_id = ?').all(userId);
@@ -1114,10 +1291,9 @@ app.post('/api/habits/save-day', async (req, res) => {
   const isAdmin = verifyAdmin(adminId);
 
   const normalizedDate = normalizeDateStr(dateStr);
-  const todayStr = new Date().toDateString();
-  const isToday = (dateStr === todayStr || normalizedDate === todayStr);
+  const isAllowedDate = isAllowedUserCalendarSave(userId, dateStr, normalizedDate, completedCount);
 
-  if (!isAdmin && !isToday) {
+  if (!isAdmin && !isAllowedDate) {
     return res.status(403).json({ error: 'Only admins can modify calendar dates.' });
   }
 

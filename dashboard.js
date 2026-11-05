@@ -204,14 +204,83 @@ function userKey(key) {
 // -------------------------------------------------------------
 // 📅 PART 1: CALENDAR LOGIC (TIER GREEN, ORANGE, WHITE-BLUE)
 // -------------------------------------------------------------
-function getDayCompletedCount(dateString) {
-  const count = localStorage.getItem(userKey("cal_tier_" + dateString));
-  return count ? parseInt(count, 10) : 0;
+let isInitialCloudSyncComplete = false;
+
+function countTruthyChecks(rawJson) {
+  if (!rawJson) return 0;
+  try {
+    const parsed = typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+    if (!parsed || typeof parsed !== "object") return 0;
+    return Object.values(parsed).filter(Boolean).length;
+  } catch (e) {
+    return 0;
+  }
 }
 
-function setDayCompletedCount(dateString, count) {
+function getSavedChecksCompletedCountForDate(dateString) {
+  if (!dateString) return 0;
+
+  // 1. Check if there is a commitment for this specific date
+  let committedCount = 0;
+  const rawCommit = localStorage.getItem(userKey(`commitment_${dateString}`));
+  if (rawCommit) {
+    try {
+      const parsedCommit = JSON.parse(rawCommit);
+      if (parsedCommit && parsedCommit.listId && (!parsedCommit.date || parsedCommit.date === dateString)) {
+        if (parsedCommit.listId === "custom") {
+          committedCount = countTruthyChecks(localStorage.getItem(userKey(`custom_checks_${dateString}`)));
+        } else {
+          const lvlId = String(parsedCommit.listId).replace("lvl_", "");
+          committedCount = Math.max(
+            countTruthyChecks(localStorage.getItem(userKey(`checks_${lvlId}_${dateString}`))),
+            countTruthyChecks(localStorage.getItem(userKey(`checks_lvl_${lvlId}_${dateString}`)))
+          );
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. Also check across custom list, all developer levels, and claim locks for this date
+  let maxListCount = countTruthyChecks(localStorage.getItem(userKey(`custom_checks_${dateString}`)));
+  for (let i = 0; i < DEVELOPER_LEVELS.length; i++) {
+    const lvlId = DEVELOPER_LEVELS[i].id;
+    const c1 = countTruthyChecks(localStorage.getItem(userKey(`checks_${lvlId}_${dateString}`)));
+    const c2 = countTruthyChecks(localStorage.getItem(userKey(`checks_lvl_${lvlId}_${dateString}`)));
+    if (c1 > maxListCount) maxListCount = c1;
+    if (c2 > maxListCount) maxListCount = c2;
+  }
+
+  const rawLock = localStorage.getItem(userKey(`claim_lock_${dateString}`));
+  if (rawLock) {
+    try {
+      const lockObj = JSON.parse(rawLock);
+      if (lockObj && typeof lockObj === "object") {
+        Object.values(lockObj).forEach(listLocks => {
+          const c = countTruthyChecks(listLocks);
+          if (c > maxListCount) maxListCount = c;
+        });
+      }
+    } catch (e) {}
+  }
+
+  return committedCount > 0 ? committedCount : maxListCount;
+}
+
+function getDayCompletedCount(dateString) {
+  const count = localStorage.getItem(userKey("cal_tier_" + dateString));
+  const storedCount = count ? (parseInt(count, 10) || 0) : 0;
+  const checksCount = getSavedChecksCompletedCountForDate(dateString);
+  return Math.max(storedCount, checksCount);
+}
+
+function setDayCompletedCount(dateString, count, allowServerSync = true) {
   const k = userKey("cal_tier_" + dateString);
   const val = parseInt(count, 10) || 0;
+
+  // Prevent initial pre-sync render from wiping existing progress with 0
+  if (val <= 0 && !isInitialCloudSyncComplete && dateString === getTodayString()) {
+    return;
+  }
 
   if (val <= 0) {
     localStorage.removeItem(k);
@@ -220,7 +289,7 @@ function setDayCompletedCount(dateString, count) {
   }
 
   // Cloud Sync: Persist calendar day in SQLite database across all browsers
-  if (currentUser && currentUser.id && Habitism.setUserCalendarDay) {
+  if (allowServerSync && currentUser && currentUser.id && Habitism.setUserCalendarDay) {
     Habitism.setUserCalendarDay(currentUser.id, dateString, val).catch(() => {});
   }
 }
@@ -810,8 +879,15 @@ function renderChecklist() {
     checklistCard.classList.add("checks-orange");
   }
 
-  // 6. Update Calendar Tier for Today
-  setDayCompletedCount(getTodayString(), completedToday);
+  // 6. Update Calendar Tier for Today (preserve committed/saved check count when browsing other levels)
+  const todayStr = getTodayString();
+  const commitmentCount = getCommitmentGlowCount();
+  const savedTodayChecksCount = getSavedChecksCompletedCountForDate(todayStr);
+  const effectiveCompletedToday = commitmentCount > 0
+    ? commitmentCount
+    : Math.max(completedToday, savedTodayChecksCount);
+
+  setDayCompletedCount(todayStr, effectiveCompletedToday);
   updateCommitmentUI();
   renderCalendar(currentCalendarDate);
 }
@@ -2423,7 +2499,10 @@ function hideGlobalTooltip() {
 // ☁️ FULL-STATE CLOUD SYNCHRONIZATION (ACROSS ALL BROWSERS)
 // -------------------------------------------------------------
 async function syncUserDataFromServer() {
-  if (!currentUser || !currentUser.id || !Habitism.getUserFullState) return;
+  if (!currentUser || !currentUser.id || !Habitism.getUserFullState) {
+    isInitialCloudSyncComplete = true;
+    return;
+  }
 
   try {
     const data = await Habitism.getUserFullState(currentUser.id);
@@ -2435,25 +2514,8 @@ async function syncUserDataFromServer() {
       Habitism.setCurrentUser(currentUser);
     }
 
-    // 2. Restore Entire Calendar History from Database
-    if (data.calendarMap) {
-      Object.keys(data.calendarMap).forEach(dateStr => {
-        const count = data.calendarMap[dateStr];
-        const k = userKey("cal_tier_" + dateStr);
-        if (count > 0) {
-          localStorage.setItem(k, count.toString());
-        } else {
-          localStorage.removeItem(k);
-        }
-      });
-      // Clear today's calendar tier if count is reset to 0 or deleted
-      const todayK = userKey("cal_tier_" + getTodayString());
-      if (!data.calendarMap[getTodayString()] || data.calendarMap[getTodayString()] === 0) {
-        localStorage.removeItem(todayK);
-      }
-    }
-
-    // 3. Restore Task States (Level, Mode, Custom Tasks, All Checks, Commitments)
+    // 2. Restore Task States FIRST (Level, Mode, Custom Tasks, All Checks, Commitments)
+    // so historical checkmarks are available when reconciling calendar dates
     if (data.taskStates) {
       const states = data.taskStates;
       Object.keys(states).forEach(stateKey => {
@@ -2473,6 +2535,48 @@ async function syncUserDataFromServer() {
       });
     }
 
+    // 3. Restore Entire Calendar History from Database
+    if (data.calendarMap) {
+      Object.keys(data.calendarMap).forEach(dateStr => {
+        const serverCount = data.calendarMap[dateStr] || 0;
+        const checksCount = getSavedChecksCompletedCountForDate(dateStr);
+        const finalCount = Math.max(serverCount, checksCount);
+        const k = userKey("cal_tier_" + dateStr);
+        if (finalCount > 0) {
+          localStorage.setItem(k, finalCount.toString());
+        } else {
+          localStorage.removeItem(k);
+        }
+      });
+    }
+
+    // 4. Reconcile any local/cloud checkmark dates whose calendar tier was missing in daily_logs
+    const prefix = userKey("");
+    const discoveredDates = new Set();
+    for (let i = 0; i < localStorage.length; i++) {
+      const fullK = localStorage.key(i);
+      if (!fullK || !fullK.startsWith(prefix)) continue;
+      const shortK = fullK.slice(prefix.length);
+      const m = shortK.match(/^(?:checks_(?:lvl_)?\d+|custom_checks|claim_lock|commitment)_(.+)$/);
+      if (m && m[1]) discoveredDates.add(m[1]);
+    }
+
+    discoveredDates.forEach(dateStr => {
+      const checksCount = getSavedChecksCompletedCountForDate(dateStr);
+      if (checksCount > 0) {
+        const calK = userKey("cal_tier_" + dateStr);
+        const currentStored = parseInt(localStorage.getItem(calK), 10) || 0;
+        const best = Math.max(currentStored, checksCount);
+        localStorage.setItem(calK, best.toString());
+        const serverVal = (data.calendarMap && data.calendarMap[dateStr]) || 0;
+        if (serverVal < best && Habitism.setUserCalendarDay) {
+          Habitism.setUserCalendarDay(currentUser.id, dateStr, best).catch(() => {});
+        }
+      }
+    });
+
+    isInitialCloudSyncComplete = true;
+
     // Restore commitment if present
     getCommitmentListId();
 
@@ -2484,6 +2588,8 @@ async function syncUserDataFromServer() {
     updateNavbarBadges();
   } catch (err) {
     console.warn('Cloud state sync note:', err.message);
+  } finally {
+    isInitialCloudSyncComplete = true;
   }
 }
 
