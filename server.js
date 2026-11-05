@@ -914,6 +914,56 @@ app.post('/api/user/task-mode', (req, res) => {
   return res.json({ success: true, mode });
 });
 
+// Helper: Sync a user's saved task list (from user_task_states) into the relational `habits` table
+function syncUserHabitsTable(userId, stateKey, taskArray) {
+  if (!userId || !Array.isArray(taskArray)) return;
+  try {
+    if (stateKey === 'custom_tasks') {
+      db.prepare('DELETE FROM habits WHERE user_id = ? AND is_custom = 1').run(userId);
+      const insertStmt = db.prepare(`
+        INSERT INTO habits (user_id, title, info, level_id, is_custom)
+        VALUES (?, ?, ?, 0, 1)
+      `);
+      for (const item of taskArray) {
+        const title = typeof item === 'string' ? item : (item && (item.text || item.title));
+        const info = (item && item.info) ? item.info : null;
+        if (title) insertStmt.run(userId, String(title).trim(), info);
+      }
+    } else if (stateKey && stateKey.startsWith('tasks_lvl_')) {
+      const levelId = parseInt(stateKey.replace('tasks_lvl_', ''), 10) || 1;
+      db.prepare('DELETE FROM habits WHERE user_id = ? AND is_custom = 0 AND level_id = ?').run(userId, levelId);
+      const insertStmt = db.prepare(`
+        INSERT INTO habits (user_id, title, info, level_id, is_custom)
+        VALUES (?, ?, ?, ?, 0)
+      `);
+      for (const item of taskArray) {
+        const title = typeof item === 'string' ? item : (item && (item.text || item.title));
+        const info = (item && item.info) ? item.info : null;
+        if (title) insertStmt.run(userId, String(title).trim(), info, levelId);
+      }
+    }
+  } catch (err) {
+    console.warn('Warning syncing habits table:', err.message);
+  }
+}
+
+// Backfill relational `habits` table from any existing `user_task_states` rows on startup
+try {
+  const existingTaskStates = db.prepare(`
+    SELECT user_id, state_key, state_value
+    FROM user_task_states
+    WHERE state_key = 'custom_tasks' OR state_key LIKE 'tasks_lvl_%'
+  `).all();
+  for (const row of existingTaskStates) {
+    try {
+      const parsed = JSON.parse(row.state_value);
+      if (Array.isArray(parsed)) {
+        syncUserHabitsTable(row.user_id, row.state_key, parsed);
+      }
+    } catch (e) {}
+  }
+} catch (e) {}
+
 // --- Multi-User State Synchronization ---
 app.post('/api/user/state/save', (req, res) => {
   const { userId, stateKey, stateValue } = req.body;
@@ -926,6 +976,11 @@ app.post('/api/user/state/save', (req, res) => {
       state_value = excluded.state_value,
       updated_at = CURRENT_TIMESTAMP
   `).run(userId, stateKey, JSON.stringify(stateValue));
+
+  // Automatically mirror custom_tasks and tasks_lvl_* into the relational `habits` table
+  if (stateKey === 'custom_tasks' || String(stateKey).startsWith('tasks_lvl_')) {
+    syncUserHabitsTable(userId, stateKey, stateValue);
+  }
 
   return res.json({ success: true });
 });
