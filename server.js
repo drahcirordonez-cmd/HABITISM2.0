@@ -1401,9 +1401,9 @@ app.post('/api/admin/password-requests/:id/approve', async (req, res) => {
 
   console.log(`👑 Admin #${adminId} approved password change request #${requestId} (Ticket: ${request.ticket_number}) for @${request.username}`);
 
-  // Broadcast announcement to Habitism Facebook Page
+  // Broadcast announcement to Habitism Facebook Page (Ticket Number & Status only to protect user privacy)
   const ticketDisplay = request.ticket_number || `REQ-${requestId}`;
-  const fbMessage = `🌸 Habitism Account Recovery Update 🌸\n\nDear Habitism Community,\n\nA password recovery request has been reviewed and APPROVED by our admin team! 🎉\n\n🎫 Ticket Number: ${ticketDisplay}\n👤 Account: @${request.username}\n✅ Status: Approved\n📅 Processed: ${new Date().toLocaleString()}\n\nIf this is your ticket, your new password is now active and you can safely log in to your Habitism dashboard. Welcome back to your habit journey! 🚀\n\n#Habitism #AccountRecovery #HabitCommunity`;
+  const fbMessage = `🌸 Habitism Account Recovery Update 🌸\n\nDear Habitism Community,\n\nA password recovery request has been reviewed and APPROVED by our admin team! 🎉\n\n🎫 Ticket Number: ${ticketDisplay}\n✅ Status: Approved\n📅 Processed: ${new Date().toLocaleString()}\n\nIf this is your ticket, your new password is now active and you can safely log in to your Habitism dashboard. Welcome back to your habit journey! 🚀\n\n#Habitism #AccountRecovery #HabitCommunity`;
 
   let fbPostId = null;
   let fbNotice = null;
@@ -1471,9 +1471,9 @@ app.post('/api/admin/password-requests/:id/reject', async (req, res) => {
 
   console.log(`👑 Admin #${adminId} rejected password change request #${requestId} (Ticket: ${request.ticket_number}) for @${request.username}`);
 
-  // Broadcast announcement to Habitism Facebook Page
+  // Broadcast announcement to Habitism Facebook Page (Ticket Number & Status only to protect user privacy)
   const ticketDisplay = request.ticket_number || `REQ-${requestId}`;
-  const fbMessage = `🌸 Habitism Account Recovery Update 🌸\n\nDear Habitism Community,\n\nA password recovery request has been reviewed and REJECTED by our admin team.\n\n🎫 Ticket Number: ${ticketDisplay}\n👤 Account: @${request.username}\n❌ Status: Rejected\n📅 Processed: ${new Date().toLocaleString()}\n\nIf this is your ticket, the submitted verification details could not be validated. If you believe this is in error, please submit a new request with your verified information or reach out to our team.\n\n#Habitism #AccountRecovery #HabitCommunity`;
+  const fbMessage = `🌸 Habitism Account Recovery Update 🌸\n\nDear Habitism Community,\n\nA password recovery request has been reviewed and REJECTED by our admin team.\n\n🎫 Ticket Number: ${ticketDisplay}\n❌ Status: Rejected\n📅 Processed: ${new Date().toLocaleString()}\n\nIf this is your ticket, the submitted verification details could not be validated. If you believe this is in error, please submit a new request with your verified information or reach out to our team.\n\n#Habitism #AccountRecovery #HabitCommunity`;
 
   let fbPostId = null;
   let fbNotice = null;

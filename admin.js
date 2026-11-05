@@ -1052,7 +1052,7 @@ function renderPasswordRequests(requests) {
 
 async function approvePasswordRequest(requestId, username, ticketNumber) {
   const ticketDisplay = ticketNumber && ticketNumber !== 'N/A' ? `Ticket #${ticketNumber}` : `Request #${requestId}`;
-  if (!confirm(`Are you sure you want to APPROVE ${ticketDisplay} for @${username}?\n\nThis will:\n1. Update user's password to the requested new password\n2. Broadcast an approval update to the Habitism Facebook Page\n3. Mark this ticket as Approved.`)) {
+  if (!confirm(`Are you sure you want to APPROVE ${ticketDisplay} for @${username}?\n\nThis will:\n1. Update user's password to the requested new password\n2. Broadcast an approval update to the Habitism Facebook Page (Ticket # & Status only — username is hidden for privacy)\n3. Mark this ticket as Approved.`)) {
     return;
   }
 
@@ -1076,7 +1076,7 @@ async function approvePasswordRequest(requestId, username, ticketNumber) {
 
 async function rejectPasswordRequest(requestId, username, ticketNumber) {
   const ticketDisplay = ticketNumber && ticketNumber !== 'N/A' ? `Ticket #${ticketNumber}` : `Request #${requestId}`;
-  if (!confirm(`Are you sure you want to REJECT ${ticketDisplay} for @${username}?\n\nThis will:\n1. Keep existing user password unchanged\n2. Broadcast a rejection update to the Habitism Facebook Page\n3. Mark this ticket as Rejected.`)) {
+  if (!confirm(`Are you sure you want to REJECT ${ticketDisplay} for @${username}?\n\nThis will:\n1. Keep existing user password unchanged\n2. Broadcast a rejection update to the Habitism Facebook Page (Ticket # & Status only — username is hidden for privacy)\n3. Mark this ticket as Rejected.`)) {
     return;
   }
 
