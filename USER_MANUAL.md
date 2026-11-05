@@ -51,6 +51,12 @@ Click the **⚙️ Mode** button in the top navigation bar to switch between two
 1. **⚡ Developer Levels**: Progress through curated, science-backed habit levels (Level 1: *Taking the first steps*, Level 2: *Let's keep it up*, Level 3: *Keep moving forward*, Level 4: *Meditation*, Level 5: *Prime your environment*).
 2. **🎯 Custom Habits**: Create and customize your own tailored list of 5 daily habits.
 
+### Adding, Removing & Restoring Default Habits (`🔄 Default`)
+- **Adding Custom Habits**: Use the input field at the bottom of the checklist to add new habits to any level or custom list. Every habit must include at least one real **English, Tagalog, or Taglish** word (e.g., *"Maglaba"*, *"Mag-push ups"*, *"Drink 8 glasses of water"*). Numbers-only inputs, mostly-number strings, and random keysmashes/gibberish are blocked.
+- **Removing Habits**: Click the **`×`** button on the right side of any habit item to remove it from the current list.
+- **Restoring Original Default Habits (`🔄 Default`)**: If you deleted or replaced tasks on a ready-made level (or Custom list) and want the original curated list back for **that specific level**, click the **`🔄 Default`** button next to the progress bar. Only the currently viewed level is restored to its original default tasks — your other levels remain untouched.
+- **Anti-Farming Lock (`🔒`)**: If you have already claimed Piggybank coins (`🔒`) on that level today, both deleting locked habits and clicking **`🔄 Default`** are blocked until tomorrow so coins cannot be farmed repeatedly.
+
 ### Committing to a List
 - Click **Commit to this?** on the checklist footer to lock your daily calendar glow to your chosen habit list for today.
 - Once committed, you can freely browse other levels without losing your progress or calendar glow.
@@ -81,7 +87,7 @@ Your calendar date on the left card illuminates dynamically based on how many ta
 ### Claiming Coins to Your Main Balance (🪙)
 - Coins earned during the day stay inside your **Piggybank** (`🐷` in the navbar and checklist footer).
 - When you finish your tasks for the day, click **Claim to Main Balance** to transfer your Piggybank coins into your permanent **Main Coin Balance** (`🪙`).
-- *Note: Claiming your Piggybank locks your checked habits for that list for the rest of the day.*
+- *Note: Claiming your Piggybank locks your checked habits for that list for the rest of the day (`🔒`) — locked habits cannot be unchecked, deleted, or reset with **`🔄 Default`** until tomorrow.*
 
 ---
 
@@ -155,7 +161,8 @@ If you forget your password or need to recover your account:
 | **Login failed** | Double-check your username/email and password, and make sure you selected the matching role under **"WHO ARE YOU?"**. |
 | **Calendar date is not glowing** | Make sure you clicked **"Commit to this?"** on your active habit list and completed at least **5 tasks** today. |
 | **Earned coins aren't in my main balance** | Click **"Claim to Main Balance"** inside the Piggybank box on your dashboard to transfer your daily earnings. |
-| **Cannot uncheck a habit** | Once you claim your Piggybank coins for a list today, those completed checkmarks are locked for the day. |
+| **Cannot add a custom habit** | Habits must contain at least one real English or Tagalog word (numbers-only and random characters/gibberish are blocked). |
+| **Cannot uncheck, delete, or click `🔄 Default`** | Once you claim your Piggybank coins (`🔒`) for a list today, completed checkmarks, deletion, and restoring the default list are locked until tomorrow. |
 | **Cannot submit another password recovery** | You already have a pending request under review. Check the Habitism Facebook Page with your recovery ticket number. |
 
 ---

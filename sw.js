@@ -4,9 +4,9 @@
 // Provides offline support and caching for the PWA.
 // Cache version - bump this when you deploy changes to force updates.
 // ============================================================================
-const CACHE_NAME = 'habitism-v5';
-const STATIC_CACHE = 'habitism-static-v5';
-const API_CACHE = 'habitism-api-v5';
+const CACHE_NAME = 'habitism-v6';
+const STATIC_CACHE = 'habitism-static-v6';
+const API_CACHE = 'habitism-api-v6';
 
 // Files to cache on install (app shell)
 const STATIC_ASSETS = [

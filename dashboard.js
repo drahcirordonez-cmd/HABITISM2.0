@@ -868,6 +868,25 @@ function renderChecklist() {
     progressBarFill.style.width = `${percent}%`;
   }
 
+  // Update Restore Default List button state (locked if coins were claimed on this list today)
+  const resetListBtn = document.getElementById("resetListBtn");
+  const resetListBtnIcon = document.getElementById("resetListBtnIcon");
+  const hasAnyLockedOnList = Object.keys(lockedIdx).some(idx => lockedIdx[idx]);
+  if (resetListBtn) {
+    if (hasAnyLockedOnList) {
+      resetListBtn.classList.add("locked");
+      if (resetListBtnIcon) resetListBtnIcon.innerText = "🔒";
+      resetListBtn.title = "🔒 Coins claimed on this list today — default habits can be restored tomorrow";
+    } else {
+      resetListBtn.classList.remove("locked");
+      if (resetListBtnIcon) resetListBtnIcon.innerText = "🔄";
+      const targetLabel = activeTaskMode === "custom"
+        ? "Custom list"
+        : `Level ${DEVELOPER_LEVELS[currentLevelIndex].id}`;
+      resetListBtn.title = `Restore original default habits for ${targetLabel}`;
+    }
+  }
+
   // 5. Dynamic Checkbox Coloring:
   // 6-7 checked boxes -> bright orange checks
   // 8+ checked boxes -> bright white-blue checks
@@ -2062,12 +2081,28 @@ function deleteTask(event, index) {
     return;
   }
 
+  const checks = getActiveChecks();
+  const wasCheckedUnclaimed = !!checks[index] && !lockedIdx[index];
+
   const tasks = getActiveTasks();
   tasks.splice(index, 1);
   saveActiveTasks(tasks);
 
+  // If the deleted task was checked today (and unclaimed), deduct its 10 piggybank coins
+  if (wasCheckedUnclaimed) {
+    const user = Habitism.getCurrentUser();
+    if (user && user.id) {
+      const newPiggybank = Math.max(0, (user.piggybank_coins || 0) - 10);
+      user.piggybank_coins = newPiggybank;
+      currentUser = user;
+      Habitism.setCurrentUser(user);
+      Habitism.syncPiggybank(user.id, newPiggybank).catch(() => {});
+      updateNavbarBadges();
+      updatePiggybankDisplay();
+    }
+  }
+
   // Re-index checks (and claim locks so they follow their tasks)
-  const checks = getActiveChecks();
   const newChecks = {};
   const newLocked = {};
   let newIdx = 0;
@@ -2084,6 +2119,75 @@ function deleteTask(event, index) {
   saveClaimLock(lock);
   renderChecklist();
 }
+
+function getDefaultTasksForActiveList() {
+  if (activeTaskMode === "custom") {
+    return JSON.parse(JSON.stringify(DEFAULT_OPTION_A_TASKS));
+  }
+  const level = DEVELOPER_LEVELS[currentLevelIndex];
+  return JSON.parse(JSON.stringify(level.tasks));
+}
+
+function isCurrentListModifiedFromDefault() {
+  const current = getActiveTasks();
+  const defaults = getDefaultTasksForActiveList();
+  if (!Array.isArray(current) || current.length !== defaults.length) return true;
+  for (let i = 0; i < defaults.length; i++) {
+    const cText = current[i] && typeof current[i] === "object" ? current[i].text : String(current[i] || "");
+    const dText = defaults[i] && typeof defaults[i] === "object" ? defaults[i].text : String(defaults[i] || "");
+    if (cText !== dText) return true;
+  }
+  return false;
+}
+
+function resetCurrentListToDefault() {
+  const lockedIdx = getLockedIndices();
+  const hasLocked = Object.keys(lockedIdx).some(idx => lockedIdx[idx]);
+  if (hasLocked) {
+    showToast("🔒 Coins were claimed on this list today — default habits can't be restored until tomorrow.");
+    return;
+  }
+
+  if (!isCurrentListModifiedFromDefault()) {
+    const listLabel = activeTaskMode === "custom"
+      ? "Custom list"
+      : `Level ${DEVELOPER_LEVELS[currentLevelIndex].id}`;
+    showToast(`ℹ️ ${listLabel} already has its original default habits.`);
+    return;
+  }
+
+  // Deduct any unclaimed piggybank coins earned on this list today before clearing its checks
+  const checks = getActiveChecks();
+  const unclaimedCheckedCount = Object.keys(checks).filter(idx => checks[idx] && !lockedIdx[idx]).length;
+  if (unclaimedCheckedCount > 0) {
+    const user = Habitism.getCurrentUser();
+    if (user && user.id) {
+      const deduct = unclaimedCheckedCount * 10;
+      const newPiggybank = Math.max(0, (user.piggybank_coins || 0) - deduct);
+      user.piggybank_coins = newPiggybank;
+      currentUser = user;
+      Habitism.setCurrentUser(user);
+      Habitism.syncPiggybank(user.id, newPiggybank).catch(() => {});
+      updateNavbarBadges();
+      updatePiggybankDisplay();
+    }
+  }
+
+  const defaultTasks = getDefaultTasksForActiveList();
+  saveActiveTasks(defaultTasks);
+  saveActiveChecks({});
+
+  renderChecklist();
+  renderCalendar(currentCalendarDate);
+
+  if (activeTaskMode === "custom") {
+    showToast("🔄 Custom list restored to default starter habits!");
+  } else {
+    const level = DEVELOPER_LEVELS[currentLevelIndex];
+    showToast(`🔄 Level ${level.id} restored to its original default habits!`);
+  }
+}
+window.resetCurrentListToDefault = resetCurrentListToDefault;
 
 function prevLevel() {
   if (activeTaskMode === "custom") return;

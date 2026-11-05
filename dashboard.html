@@ -198,6 +198,10 @@
           <div class="progress-bar-container">
             <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
           </div>
+          <button type="button" class="btn-reset-list" id="resetListBtn" onclick="resetCurrentListToDefault()" title="Restore original default habits for this level" aria-label="Restore default habits for this level">
+            <span id="resetListBtnIcon">🔄</span>
+            <span id="resetListBtnText">Default</span>
+          </button>
         </div>
 
         <div class="card-body checklist-body">
@@ -468,7 +472,7 @@
         </div>
 
         <div class="manual-section">
-          <h4>4. Daily Habit Tracking</h4>
+          <h4>4. Daily Habit Tracking &amp; Customizing Lists</h4>
           <ul>
             <li><strong>Dashboard:</strong> You will see your Level and a list of daily habits. Check the box next to each task you complete. Complete at least <strong>5 tasks</strong> to keep your streak alive.</li>
             <li><strong>Task Modes:</strong>
@@ -478,6 +482,8 @@
               </ul>
             </li>
             <li>Switch between modes using the <strong>⚙️ Mode</strong> button in the navbar.</li>
+            <li><strong>Adding Custom Habits:</strong> Use the input field at the bottom of the checklist to add your own habits to any list. Habit entries must include at least one real <strong>English, Tagalog, or Taglish</strong> word (e.g., <em>"Maglaba"</em>, <em>"Mag-push ups"</em>, <em>"Drink 8 glasses of water"</em>). Numbers-only inputs and random gibberish are not allowed.</li>
+            <li><strong>Removing &amp; Restoring Default Habits (🔄 Default):</strong> You can remove tasks on any list using the <strong>&times;</strong> button. If you deleted or replaced the tasks on a level and want the original ready-made list back for that specific level, click the <strong>🔄 Default</strong> button next to the progress bar to restore that level's original default habits without affecting your other levels.</li>
           </ul>
         </div>
 
@@ -531,6 +537,7 @@
                 <li>Coins earned during the day stay in your Piggybank (🐷 icon in navbar).</li>
                 <li>At the end of the day, click <strong>Claim to Main Balance</strong> to move them to your main coin counter (🪙 icon).</li>
                 <li>Main balance coins are used to buy Streak Freezes.</li>
+                <li><strong>Daily Claim Lock (🔒):</strong> Once you claim Piggybank coins on a list today, completed habits on that list are locked for the rest of the day &mdash; they cannot be unchecked, deleted, or reset with <strong>🔄 Default</strong> until tomorrow.</li>
               </ul>
             </li>
           </ul>
@@ -618,6 +625,14 @@
                 <td>Claim them from your Piggybank first.</td>
               </tr>
               <tr>
+                <td><strong>Cannot add a custom habit</strong></td>
+                <td>Habits must contain at least one real English or Tagalog word (numbers-only and random characters/gibberish are blocked).</td>
+              </tr>
+              <tr>
+                <td><strong>Cannot delete a habit or click 🔄 Default</strong></td>
+                <td>If you already claimed Piggybank coins (🔒) on that list today, deleting locked tasks and restoring the default list are locked until tomorrow.</td>
+              </tr>
+              <tr>
                 <td><strong>Forgot password not working</strong></td>
                 <td>Make sure your core verifier answer matches what you entered at signup, and check that you don't already have a pending ticket.</td>
               </tr>
@@ -651,8 +666,8 @@
   <!-- Global Unclipped Tooltip Portal -->
   <div id="habitismGlobalTooltip" class="global-tooltip-popup" role="tooltip" aria-hidden="true"></div>
 
-  <script src="app.js?v=2.4"></script>
-  <script src="dashboard.js?v=2.4"></script>
+  <script src="app.js?v=2.5"></script>
+  <script src="dashboard.js?v=2.5"></script>
   <script>
     // Service Worker Registration for PWA
     if ('serviceWorker' in navigator) {

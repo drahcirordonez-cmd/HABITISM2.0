@@ -437,6 +437,47 @@ body {
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
 }
 
+/* 🔄 Restore Default List Button */
+.btn-reset-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  background: rgba(168, 85, 247, 0.16);
+  border: 1px solid rgba(168, 85, 247, 0.42);
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-list:hover {
+  background: rgba(168, 85, 247, 0.32);
+  border-color: #c084fc;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(168, 85, 247, 0.35);
+}
+
+.btn-reset-list:active {
+  transform: translateY(0);
+}
+
+.btn-reset-list.locked,
+.btn-reset-list.locked:hover {
+  cursor: not-allowed;
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fde68a;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.85;
+}
+
 /* ℹ️ INFORMATION (i) BUTTON & TOOLTIPS (UNCLIPPED & HIGH CONTRAST) */
 .info-btn {
   width: 17px;
