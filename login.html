@@ -220,11 +220,18 @@
       border-color: rgba(168, 85, 247, 0.4);
     }
 
-    .role-pill.active {
-      background: linear-gradient(135deg, rgba(147, 51, 234, 0.35) 0%, rgba(99, 102, 241, 0.35) 100%);
+    .role-pill#roleUserBtn.active {
+      background: linear-gradient(135deg, rgba(147, 51, 234, 0.45) 0%, rgba(99, 102, 241, 0.45) 100%);
       border-color: #a855f7;
       color: #ffffff;
-      box-shadow: 0 0 14px rgba(168, 85, 247, 0.35);
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.4);
+    }
+
+    .role-pill#roleAdminBtn.active {
+      background: linear-gradient(135deg, rgba(217, 119, 6, 0.45) 0%, rgba(180, 83, 9, 0.45) 100%);
+      border-color: #f59e0b;
+      color: #fef08a;
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.4);
     }
 
     .quick-fill-row {
@@ -300,9 +307,22 @@
 
     .auth-error {
       color: #f87171;
-      font-size: 0.85rem;
-      text-align: center;
+      font-size: 0.86rem;
+      font-weight: 600;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      padding: 10px 14px;
+      border-radius: 10px;
+      margin-bottom: 10px;
       display: none;
+      line-height: 1.45;
+      text-align: center;
+      animation: authErrorFade 0.25s ease-out;
+    }
+
+    @keyframes authErrorFade {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @media (max-width: 768px) {
@@ -341,7 +361,7 @@
 
       <!-- Who Are You Selector -->
       <div class="role-selector-bar">
-        <span class="role-title">Who Are You?</span>
+        <span class="role-title">WHO ARE YOU?</span>
         <div class="role-pills">
           <button type="button" class="role-pill active" id="roleUserBtn" onclick="selectRole('user')">
             <span>👤</span>
@@ -877,6 +897,11 @@
       document.getElementById('authIdentifier').value = username;
       document.getElementById('authPassword').value = password;
       selectRole(username === 'admin' ? 'admin' : 'user');
+      const errEl = document.getElementById('authError');
+      if (errEl) {
+        errEl.innerText = '';
+        errEl.style.display = 'none';
+      }
     }
 
     function openForgotModal() {
@@ -920,6 +945,7 @@
       const identifier = identifierInput.value.trim();
       const password = passwordInput.value;
       const errEl = document.getElementById('authError');
+      errEl.innerText = '';
       errEl.style.display = 'none';
 
       // Check sign-in requirements before sending any request
@@ -937,10 +963,12 @@
       }
 
       try {
-        const user = await Habitism.login(identifier, password);
+        const user = await Habitism.login(identifier, password, currentSelectedRole);
         
         // Routing based on role and commitment
-        if (user.role === 'admin') {
+        if (currentSelectedRole === 'admin' && user.role === 'admin') {
+          window.location.href = 'admin.html';
+        } else if (user.role === 'admin') {
           window.location.href = 'admin.html';
         } else if (user.committed) {
           window.location.href = 'dashboard.html';

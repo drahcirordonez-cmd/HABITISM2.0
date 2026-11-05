@@ -143,21 +143,27 @@ const Habitism = (() => {
     return data.user;
   }
 
-  async function login(identifier, password) {
+  async function login(identifier, password, role = 'user') {
     try {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, password })
+        body: JSON.stringify({ identifier, password, role })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Invalid credentials');
+      if (!res.ok) throw new Error(data.error || 'Invalid username/email or password.');
       setCurrentUser(data.user);
       return data.user;
     } catch (err) {
+      if (err.message && err.message.includes('bhie')) {
+        throw err;
+      }
       // Fallback pre-seeded offline accounts if server offline
       const idClean = (identifier || '').trim().toLowerCase();
       if (idClean === 'admin' && password === 'admin123') {
+        if (role === 'user') {
+          throw new Error("you are not a user. You're an admin, bhie. Umayos ka.");
+        }
         const adminUser = {
           id: 1,
           name: 'Habitism Administrator',
@@ -173,6 +179,9 @@ const Habitism = (() => {
         setCurrentUser(adminUser);
         return adminUser;
       } else if (idClean === 'user' && password === 'user123') {
+        if (role === 'admin') {
+          throw new Error("You are not an admin. User ka lang, bhie. I-kalma mo. Kindly select the correct role.");
+        }
         const standardUser = {
           id: 2,
           name: 'Habit Champion',

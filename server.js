@@ -588,26 +588,62 @@ app.post('/api/auth/check-availability', (req, res) => {
   return res.json({ available: true });
 });
 
-// --- Authentication: Secure Login (Username OR Email + Password) ---
+// --- Authentication: Secure Role-Based Login (Username OR Email + Password + Role Validation) ---
 app.post('/api/auth/login', (req, res) => {
-  const { identifier, email, username, password } = req.body;
+  const { identifier, email, username, password, role, selectedRole } = req.body || {};
   const loginId = (identifier || username || email || '').trim().toLowerCase();
+  const chosenRole = (selectedRole || role || 'user').trim().toLowerCase();
   
   if (!loginId || !password) {
     return res.status(400).json({ error: 'Username/Email and password are required.' });
   }
 
+  // 1. Look up user in users table by username OR email
   const user = db.prepare(`
-    SELECT id, name, username, email, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name 
+    SELECT id, name, username, email, password, role, committed, coins, streak, streak_freezes, task_mode, facebook_id, facebook_name 
     FROM users 
-    WHERE (LOWER(username) = ? OR LOWER(email) = ?) AND password = ?
-  `).get(loginId, loginId, password);
+    WHERE LOWER(username) = ? OR LOWER(email) = ?
+  `).get(loginId, loginId);
 
-  if (!user) {
+  // 2. If no user found OR password does not match -> return generic error without revealing existence
+  if (!user || user.password !== password) {
     return res.status(401).json({ error: 'Invalid username/email or password.' });
   }
 
-  return res.json({ success: true, user });
+  // 3. User found and password matches -> validate user.role against chosenRole
+  if (chosenRole === 'admin') {
+    if (user.role !== 'admin') {
+      return res.status(403).json({
+        error: "You are not an admin. User ka lang, bhie. I-kalma mo. Kindly select the correct role.",
+        roleMismatch: true
+      });
+    }
+  } else if (chosenRole === 'user') {
+    if (user.role === 'admin') {
+      return res.status(403).json({
+        error: "you are not a user. You're an admin, bhie. Umayos ka.",
+        roleMismatch: true
+      });
+    }
+  }
+
+  // Return safe user object (excluding plaintext password)
+  const safeUser = {
+    id: user.id,
+    name: user.name,
+    username: user.username,
+    email: user.email,
+    role: user.role,
+    committed: user.committed,
+    coins: user.coins,
+    streak: user.streak,
+    streak_freezes: user.streak_freezes,
+    task_mode: user.task_mode,
+    facebook_id: user.facebook_id,
+    facebook_name: user.facebook_name
+  };
+
+  return res.json({ success: true, user: safeUser });
 });
 
 // --- Authentication: Forgot / Reset Password Workflow (Core Verifier & Ticket System) ---
