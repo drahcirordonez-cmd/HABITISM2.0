@@ -71,12 +71,6 @@
         <span>Mode</span>
       </button>
 
-      <!-- Accountability / Facebook Status (Priority 2 Collapse) -->
-      <button class="nav-btn-link btn-secondary nav-item-accountability" id="navBtnAccountability" onclick="openAccountabilityModal()" title="Facebook Graph API Commitment Status">
-        <span>📢</span>
-        <span>Accountability</span>
-      </button>
-
       <!-- Feedback Button -->
       <button class="nav-btn-link btn-secondary nav-item-feedback" id="navBtnFeedback" onclick="openFeedbackModal()" title="Share your feedback, ideas, or report a bug">
         <span>💬</span>
@@ -120,12 +114,6 @@
           <button type="button" class="overflow-item" id="overflowItemMode" onclick="openTaskModeModal()">
             <span>⚙️</span>
             <span>Routine Mode</span>
-          </button>
-
-          <!-- Accountability item in dropdown (Priority 2) -->
-          <button type="button" class="overflow-item" id="overflowItemAccountability" onclick="openAccountabilityModal()">
-            <span>📢</span>
-            <span>Accountability</span>
           </button>
 
           <!-- Feedback item in dropdown -->
@@ -370,36 +358,6 @@
         <button class="nav-btn-link btn-primary" id="printCertBtn" onclick="window.print()">
           <span>🖨️ Print / Save Certificate</span>
         </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 5. Facebook Accountability Status Modal -->
-  <div class="modal-overlay" id="accountabilityModal">
-    <div class="modal-card">
-      <button class="modal-close" onclick="closeModal('accountabilityModal')">&times;</button>
-      <div class="modal-title">📢 Facebook Social Accountability</div>
-      <div class="modal-subtitle">Habitism backend monitors your progress before the 11:59 PM deadline.</div>
-
-      <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 14px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.88rem; line-height: 1.5;">
-        <div><strong>Connected Page:</strong> Habitism</div>
-        <div><strong>Page ID:</strong> <code style="color: #60a5fa;">1496888330165860</code></div>
-        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-          <span><strong>Your Linked Account:</strong></span>
-          <div id="fbAccountLinkStatus" style="font-size: 0.82rem;">Checking...</div>
-        </div>
-        <div style="margin-top: 8px;"><strong>Policy Consequence:</strong> Automated Graph API post on unfulfilled daily habits:</div>
-        <div style="margin-top: 6px; padding: 6px 10px; background: rgba(0,0,0,0.3); border-left: 3px solid #f97316; font-family: monospace; font-size: 0.82rem; color: #fed7aa;">
-          &ldquo;This person made this commitment but did not complete it.&rdquo;
-        </div>
-      </div>
-
-      <button class="nav-btn-link btn-primary" style="width: 100%; justify-content: center; padding: 11px;" onclick="handleTestAccountabilityPost()">
-        <span>🧪 Test Graph API Accountability Check</span>
-      </button>
-
-      <div id="accountabilityLog" style="margin-top: 14px; font-size: 0.82rem; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); min-height: 48px;">
-        <span style="color: var(--text-muted);">Click above to test backend Graph API integration live.</span>
       </div>
     </div>
   </div>

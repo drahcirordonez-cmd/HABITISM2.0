@@ -1137,92 +1137,6 @@ function selectTaskMode(mode) {
   showToast(mode === "custom" ? "Switched to: 🎯 5 Custom Habits" : "Switched to: ⚡ Ready-made Levels");
 }
 
-// Facebook Accountability Modal & Live Test
-function openAccountabilityModal() {
-  currentUser = Habitism.getCurrentUser();
-  const fbStatusDisplay = document.getElementById("fbAccountLinkStatus");
-  if (fbStatusDisplay) {
-    if (currentUser.facebook_id) {
-      fbStatusDisplay.innerHTML = `
-        <span style="color: #60a5fa; font-weight: 700;">Linked as: ${escapeHtml(currentUser.facebook_name || currentUser.name)} (ID: ${currentUser.facebook_id})</span>
-        <button class="nav-btn-link btn-secondary" style="margin-left: 10px; font-size: 0.76rem; padding: 3px 8px;" onclick="handleUnlinkFacebook()">Unlink</button>
-      `;
-    } else {
-      fbStatusDisplay.innerHTML = `
-        <span style="color: #94a3b8;">Not linked to Facebook.</span>
-        <button class="nav-btn-link btn-primary" style="margin-left: 10px; font-size: 0.76rem; padding: 3px 8px;" onclick="handleLinkFacebookPrompt()">Link Facebook Account</button>
-      `;
-    }
-  }
-  openModal("accountabilityModal");
-}
-
-async function handleLinkFacebookPrompt() {
-  try {
-    const fbUser = await Habitism.loginWithFacebook();
-    if (fbUser && fbUser.facebook_id) {
-      await Habitism.linkFacebook(currentUser.id, fbUser.facebook_id, fbUser.facebook_name || fbUser.name);
-      currentUser = Habitism.getCurrentUser();
-      updateNavbarBadges();
-      openAccountabilityModal();
-      showToast("✔ Facebook profile linked successfully!");
-    }
-  } catch (err) {
-    if (err.message && !err.message.includes('cancelled')) {
-      showToast("Facebook notice: " + err.message);
-    }
-  }
-}
-
-async function handleUnlinkFacebook() {
-  if (!confirm("Are you sure you want to unlink Facebook?")) return;
-  await Habitism.unlinkFacebook(currentUser.id);
-  updateNavbarBadges();
-  openAccountabilityModal();
-  showToast("Facebook account unlinked.");
-}
-
-async function handleTestAccountabilityPost() {
-  const logEl = document.getElementById("accountabilityLog");
-  logEl.innerHTML = `<div style="color: #93c5fd;">⏳ Submitting unfulfilled habits to Facebook Graph API (Page ID 1496888330165860)...</div>`;
-
-  const activeTasks = getActiveTasks();
-  const activeChecks = getActiveChecks();
-  const failedTasks = activeTasks.filter((t, idx) => !activeChecks[idx]);
-
-  const res = await Habitism.simulateAccountabilityCheck(getTodayString(), failedTasks, activeTasks);
-  if (res) {
-    if (res.shielded) {
-      logEl.innerHTML = `
-        <div style="color: #6ee7b7; font-weight: 700;">❄️ STREAK FROZEN!</div>
-        <div style="color: #cbd5e1; margin-top: 4px;">A Streak Freeze was consumed to protect your ${currentUser.streak || 0}-day streak. Facebook post skipped.</div>
-      `;
-    } else {
-      const failedListHtml = failedTasks.length > 0 
-        ? failedTasks.map(t => `<div style="color: #fca5a5; font-size: 0.8rem; margin: 2px 0;">❌ [Incomplete] ${escapeHtml(t.text || t)}</div>`).join('')
-        : `<div style="color: #cbd5e1; font-size: 0.8rem;">❌ All pending habits marked unfulfilled</div>`;
-
-      logEl.innerHTML = `
-        <div style="color: #f87171; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-          <span>🚨</span>
-          <span>FACEBOOK ACCOUNTABILITY POST TRIGGERED!</span>
-        </div>
-        <div style="margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.4); border-radius: 8px; border-left: 3px solid #f87171;">
-          <div style="font-weight: 700; color: #fed7aa; margin-bottom: 4px;">&ldquo;This person made this commitment but did not complete it.&rdquo;</div>
-          <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 6px;">Target Page: <strong>Habitism</strong> (ID: 1496888330165860) &bull; User: <strong>${escapeHtml(currentUser.name)}</strong></div>
-          <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
-            <div style="font-size: 0.76rem; color: #e2e8f0; font-weight: 600; margin-bottom: 2px;">Highlighted Unfulfilled Habits:</div>
-            ${failedListHtml}
-          </div>
-        </div>
-        <div style="color: #f87171; font-size: 0.76rem; margin-top: 6px;">Penalty Applied: Daily streak reset to 0 days.</div>
-      `;
-    }
-    updateStreak();
-    updateNavbarBadges();
-  }
-}
-
 // Toast helper
 function showToast(text) {
   const toast = document.getElementById("habitToast");
@@ -1597,7 +1511,6 @@ function evaluateNavbarOverflow() {
   const maxRightBound = Math.min(window.innerWidth - screenEdgeMargin, navbarRect.right - screenEdgeMargin);
 
   const btnLogout = document.getElementById("navBtnLogout");
-  const btnAccountability = document.getElementById("navBtnAccountability");
   const btnMode = document.getElementById("navBtnMode");
   const btnCert = document.getElementById("navBtnCert");
   const overflowToggle = document.getElementById("navOverflowToggle");
@@ -1620,37 +1533,24 @@ function evaluateNavbarOverflow() {
     return;
   }
 
-  // Step 1: Collapse Log Out (and Admin) -> Show Hamburger Menu
+  // Step 1: Collapse Log Out, Admin, User Guide, and Feedback -> Show Hamburger Menu
   navActions.classList.add("collapse-stage-1");
 
-  // If the hamburger icon itself or Accountability button does not fit comfortably,
-  // immediately include the Accountability button in the hamburger icon (Stage 2)
   const isToggleOver1 = isOver(overflowToggle) || isOver(overflowMenu) || (navActions.scrollWidth > navActions.clientWidth);
-  const isAccOver = isOver(btnAccountability);
+  const isModeOver = isOver(btnMode);
 
-  if (isToggleOver1 || isAccOver) {
-    // Step 2: Collapse Accountability + Log Out into hamburger icon
+  if (isToggleOver1 || isModeOver) {
+    // Step 3: Collapse Mode into hamburger icon as well
     navActions.classList.remove("collapse-stage-1");
-    navActions.classList.add("collapse-stage-2");
+    navActions.classList.add("collapse-stage-3");
 
-    // Check if hamburger icon or Mode overflows in Stage 2
-    const isToggleOver2 = isOver(overflowToggle) || isOver(overflowMenu) || (navActions.scrollWidth > navActions.clientWidth);
-    const isModeOver = isOver(btnMode);
+    const isToggleOver3 = isOver(overflowToggle) || isOver(overflowMenu) || (navActions.scrollWidth > navActions.clientWidth);
+    const isCertOver = isOver(btnCert);
 
-    if (isToggleOver2 || isModeOver) {
-      // Step 3: Collapse Mode + Accountability + Log Out into hamburger icon
-      navActions.classList.remove("collapse-stage-2");
-      navActions.classList.add("collapse-stage-3");
-
-      // Check if hamburger icon or Certificate overflows in Stage 3
-      const isToggleOver3 = isOver(overflowToggle) || isOver(overflowMenu) || (navActions.scrollWidth > navActions.clientWidth);
-      const isCertOver = isOver(btnCert);
-
-      if (isToggleOver3 || isCertOver) {
-        // Step 4: Collapse Certificate + Mode + Accountability + Log Out into hamburger icon
-        navActions.classList.remove("collapse-stage-3");
-        navActions.classList.add("collapse-stage-4");
-      }
+    if (isToggleOver3 || isCertOver) {
+      // Step 4: Collapse Certificate + Mode + Log Out into hamburger icon
+      navActions.classList.remove("collapse-stage-3");
+      navActions.classList.add("collapse-stage-4");
     }
   }
 }
