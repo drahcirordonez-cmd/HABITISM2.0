@@ -689,13 +689,17 @@ body {
 
 /* Stage 1: Log Out (and Admin) outside -> Move to Hamburger */
 .collapse-stage-1 .nav-item-logout,
-.collapse-stage-1 .nav-item-admin {
+.collapse-stage-1 .nav-item-admin,
+.collapse-stage-1 .nav-item-guide,
+.collapse-stage-1 .nav-item-feedback {
   display: none !important;
 }
 .collapse-stage-1 .nav-overflow-menu {
   display: flex !important;
 }
-.collapse-stage-1 #overflowItemLogout {
+.collapse-stage-1 #overflowItemLogout,
+.collapse-stage-1 #overflowItemGuide,
+.collapse-stage-1 #overflowItemFeedback {
   display: flex !important;
 }
 .collapse-stage-1 #overflowItemAdmin.is-admin {
@@ -705,6 +709,8 @@ body {
 /* Stage 2: Accountability + Log Out outside -> Move to Hamburger */
 .collapse-stage-2 .nav-item-logout,
 .collapse-stage-2 .nav-item-admin,
+.collapse-stage-2 .nav-item-guide,
+.collapse-stage-2 .nav-item-feedback,
 .collapse-stage-2 .nav-item-accountability {
   display: none !important;
 }
@@ -712,6 +718,8 @@ body {
   display: flex !important;
 }
 .collapse-stage-2 #overflowItemLogout,
+.collapse-stage-2 #overflowItemGuide,
+.collapse-stage-2 #overflowItemFeedback,
 .collapse-stage-2 #overflowItemAccountability {
   display: flex !important;
 }
@@ -722,6 +730,8 @@ body {
 /* Stage 3: Mode + Accountability + Log Out outside -> Move to Hamburger */
 .collapse-stage-3 .nav-item-logout,
 .collapse-stage-3 .nav-item-admin,
+.collapse-stage-3 .nav-item-guide,
+.collapse-stage-3 .nav-item-feedback,
 .collapse-stage-3 .nav-item-accountability,
 .collapse-stage-3 .nav-item-mode {
   display: none !important;
@@ -730,6 +740,8 @@ body {
   display: flex !important;
 }
 .collapse-stage-3 #overflowItemLogout,
+.collapse-stage-3 #overflowItemGuide,
+.collapse-stage-3 #overflowItemFeedback,
 .collapse-stage-3 #overflowItemAccountability,
 .collapse-stage-3 #overflowItemMode {
   display: flex !important;
@@ -741,6 +753,8 @@ body {
 /* Stage 4: Certificate + Mode + Accountability + Log Out outside -> Move to Hamburger */
 .collapse-stage-4 .nav-item-logout,
 .collapse-stage-4 .nav-item-admin,
+.collapse-stage-4 .nav-item-guide,
+.collapse-stage-4 .nav-item-feedback,
 .collapse-stage-4 .nav-item-accountability,
 .collapse-stage-4 .nav-item-mode,
 .collapse-stage-4 .nav-item-cert {
@@ -750,6 +764,8 @@ body {
   display: flex !important;
 }
 .collapse-stage-4 #overflowItemLogout,
+.collapse-stage-4 #overflowItemGuide,
+.collapse-stage-4 #overflowItemFeedback,
 .collapse-stage-4 #overflowItemAccountability,
 .collapse-stage-4 #overflowItemMode,
 .collapse-stage-4 #overflowItemCert {
@@ -767,20 +783,104 @@ body {
   }
   .collapse-stage-1 .nav-item-logout,
   .collapse-stage-1 .nav-item-admin,
+  .collapse-stage-1 .nav-item-guide,
+  .collapse-stage-1 .nav-item-feedback,
   .collapse-stage-2 .nav-item-logout,
   .collapse-stage-2 .nav-item-admin,
+  .collapse-stage-2 .nav-item-guide,
+  .collapse-stage-2 .nav-item-feedback,
   .collapse-stage-2 .nav-item-accountability,
   .collapse-stage-3 .nav-item-logout,
   .collapse-stage-3 .nav-item-admin,
+  .collapse-stage-3 .nav-item-guide,
+  .collapse-stage-3 .nav-item-feedback,
   .collapse-stage-3 .nav-item-accountability,
   .collapse-stage-3 .nav-item-mode,
   .collapse-stage-4 .nav-item-logout,
   .collapse-stage-4 .nav-item-admin,
+  .collapse-stage-4 .nav-item-guide,
+  .collapse-stage-4 .nav-item-feedback,
   .collapse-stage-4 .nav-item-accountability,
   .collapse-stage-4 .nav-item-mode,
   .collapse-stage-4 .nav-item-cert {
     display: flex !important;
   }
+}
+
+/* User Manual Modal Styles */
+.manual-modal-body {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 8px;
+  text-align: left;
+  color: #e2e8f0;
+  font-size: 0.88rem;
+  line-height: 1.58;
+}
+
+.manual-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.manual-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.45);
+  border-radius: 6px;
+}
+
+.manual-section {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.manual-section h4 {
+  margin: 0 0 8px 0;
+  color: #c084fc;
+  font-size: 0.98rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manual-section ul, .manual-section ol {
+  margin: 6px 0 0 0;
+  padding-left: 20px;
+}
+
+.manual-section li {
+  margin-bottom: 4px;
+}
+
+.manual-callout {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(168, 85, 247, 0.14);
+  border-left: 3px solid #a855f7;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  color: #f3e8ff;
+}
+
+.manual-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.82rem;
+}
+
+.manual-table th, .manual-table td {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 7px 10px;
+  text-align: left;
+}
+
+.manual-table th {
+  background: rgba(147, 51, 234, 0.22);
+  color: #f8fafc;
+  font-weight: 700;
 }
 
 

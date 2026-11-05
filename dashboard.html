@@ -83,6 +83,12 @@
         <span>Feedback</span>
       </button>
 
+      <!-- User Guide Button -->
+      <button class="nav-btn-link btn-secondary nav-item-guide" id="navBtnGuide" onclick="openUserManualModal()" title="Open the Habitism User Guide">
+        <span>📖</span>
+        <span>User Guide</span>
+      </button>
+
       <!-- Admin Portal Button (Collapses into overflow) -->
       <a href="admin.html" class="nav-btn-link btn-secondary nav-item-admin" id="adminPortalBtn" style="display:none; border-color: rgba(251, 191, 36, 0.4); color: #fde68a; background: rgba(251, 191, 36, 0.12);" title="Open Administrator Management Dashboard">
         <span>👑</span>
@@ -126,6 +132,12 @@
           <button type="button" class="overflow-item" id="overflowItemFeedback" onclick="openFeedbackModal()">
             <span>💬</span>
             <span>Feedback</span>
+          </button>
+
+          <!-- User Guide item in dropdown -->
+          <button type="button" class="overflow-item" id="overflowItemGuide" onclick="openUserManualModal()">
+            <span>📖</span>
+            <span>User Guide</span>
           </button>
 
           <!-- Admin item in dropdown -->
@@ -436,6 +448,243 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 7. User Guide / User Manual Modal (No Admin Disclosure) -->
+  <div class="modal-overlay" id="userManualModal">
+    <div class="modal-card" style="max-width: 780px; width: 95%;">
+      <button class="modal-close" onclick="closeModal('userManualModal')">&times;</button>
+      <div class="modal-title">📖 HABITISM — User Guide</div>
+      <div class="modal-subtitle">Everything you need to build consistency, earn coins, and watch your companion bloom.</div>
+
+      <div class="manual-modal-body" style="margin-top: 14px;">
+        <div class="manual-section">
+          <h4>🌸 Welcome</h4>
+          <p style="margin: 0;"><strong>HABITISM</strong> helps you build life-changing consistency through daily habits, streak tracking, rewards, and real accountability. Complete your daily tasks before midnight, earn coins, protect your streak, and watch your living companion bloom.</p>
+        </div>
+
+        <div class="manual-section">
+          <h4>1. Creating Your Account</h4>
+          <ul>
+            <li>Go to the <strong>Sign Up</strong> page.</li>
+            <li>Fill in:
+              <ul>
+                <li><strong>Name</strong> (max 80 characters, letters and spaces only)</li>
+                <li><strong>Username</strong> (max 16 characters, letters and numbers only, unique)</li>
+                <li><strong>Email</strong> (max 254 characters, unique)</li>
+                <li><strong>Password</strong> (8–64 characters: at least 1 letter, 1 number, 1 special character)</li>
+                <li><strong>Who do you love the most?</strong> (max 80 characters, letters and spaces only)</li>
+              </ul>
+            </li>
+          </ul>
+          <div class="manual-callout">
+            🔒 <strong>Important: Core Verifier</strong><br>
+            The question <em>"Who do you love the most?"</em> is your account recovery key. Write it down and do not share it with anyone. If you forget your password or your account is compromised, this answer is required to recover your account.
+          </div>
+        </div>
+
+        <div class="manual-section">
+          <h4>2. Logging In</h4>
+          <ul>
+            <li>Go to the <strong>Login</strong> page.</li>
+            <li>Select <strong>WHO ARE YOU?</strong>:
+              <ul>
+                <li><strong>👤 Standard User</strong> (default)</li>
+                <li><strong>👑 Administrator</strong></li>
+              </ul>
+            </li>
+            <li>Enter your <strong>Username or Email</strong> and <strong>Password</strong>, then click <strong>Log In</strong>.</li>
+            <li>If you select the wrong role for your account, you will see a friendly error asking you to select the correct role.</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h4>3. Accepting Your Commitment</h4>
+          <p style="margin: 0 0 6px 0;">Before using the dashboard, you must accept the daily commitment on the <strong>Rules</strong> page:</p>
+          <ul>
+            <li>Check both pledge boxes.</li>
+            <li>Click <strong>I Accept The Commitment • Enter Dashboard</strong>.</li>
+            <li>This locks in your promise to complete daily habits before <strong>11:59 PM</strong>.</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h4>4. Daily Habit Tracking</h4>
+          <ul>
+            <li><strong>Dashboard:</strong> You will see your Level and a list of daily habits. Check the box next to each task you complete. Complete at least <strong>5 tasks</strong> to keep your streak alive.</li>
+            <li><strong>Task Modes:</strong>
+              <ul>
+                <li><strong>Developer Levels:</strong> Ready-made habits (Level 1, 2, 3, 4, 5).</li>
+                <li><strong>Custom:</strong> Create your own 5 daily habits.</li>
+              </ul>
+            </li>
+            <li>Switch between modes using the <strong>⚙️ Mode</strong> button in the navbar.</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h4>5. Calendar &amp; Streak Glow</h4>
+          <p style="margin: 0;">Your calendar date glows based on how many tasks you complete today:</p>
+          <table class="manual-table">
+            <thead>
+              <tr>
+                <th>Tasks Completed</th>
+                <th>Glow Color</th>
+                <th>Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>5</strong></td>
+                <td>🟢 Green</td>
+                <td>Met daily goal</td>
+              </tr>
+              <tr>
+                <td><strong>6–7</strong></td>
+                <td>🟠 Orange</td>
+                <td>Exceeded daily goal</td>
+              </tr>
+              <tr>
+                <td><strong>8+</strong></td>
+                <td>🔵 Light Blue</td>
+                <td>Outstanding</td>
+              </tr>
+            </tbody>
+          </table>
+          <ul style="margin-top: 8px;">
+            <li>The glow reflects your <strong>committed list</strong> for today.</li>
+            <li>You can browse other levels without losing your glow.</li>
+            <li>The glow and checkboxes reset at midnight.</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h4>6. Coins &amp; Piggybank</h4>
+          <ul>
+            <li><strong>Earning Coins:</strong>
+              <ul>
+                <li>Check a task &rarr; <strong>+10 coins</strong> to your Piggybank.</li>
+                <li>Uncheck a task &rarr; <strong>&minus;10 coins</strong> from Piggybank (prevents double-counting if you check and uncheck repeatedly).</li>
+              </ul>
+            </li>
+            <li><strong>Claiming Coins:</strong>
+              <ul>
+                <li>Coins earned during the day stay in your Piggybank (🐷 icon in navbar).</li>
+                <li>At the end of the day, click <strong>Claim to Main Balance</strong> to move them to your main coin counter (🪙 icon).</li>
+                <li>Main balance coins are used to buy Streak Freezes.</li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h4>7. Streak Freezes</h4>
+          <p style="margin: 0 0 6px 0;">A <strong>Streak Freeze</strong> (❄️) protects your streak from resetting if you miss a day.</p>
+          <ul>
+            <li><strong>Cost:</strong> 50 coins in the Shop.</li>
+            <li>Automatically consumed if you miss a commitment (no Facebook post is published).</li>
+            <li>You start with <strong>1 free Streak Freeze</strong>.</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h4>8. Living Companion</h4>
+          <p style="margin: 0 0 6px 0;">Your companion evolves as your streak grows:</p>
+          <ul>
+            <li><strong>0–1 days:</strong> Nurturing Seed 🌰</li>
+            <li><strong>2–6 days:</strong> Growing stages 🌱 &rarr; 🌿</li>
+            <li><strong>7+ days:</strong> Radiant Bloom 🌸 &rarr; 🪷</li>
+          </ul>
+          <p style="margin: 6px 0 0 0;">Click the companion widget in the navbar to view your current stage.</p>
+        </div>
+
+        <div class="manual-section">
+          <h4>9. Weekly Certificate</h4>
+          <p style="margin: 0 0 6px 0;">Complete a full <strong>7-day streak</strong> to unlock a printable Weekly Certificate.</p>
+          <ul>
+            <li>Click <strong>🏆 Certificate</strong> in the navbar.</li>
+            <li>If unlocked, click <strong>Print / Save Certificate</strong> to save or print your certificate.</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h4>10. Feedback</h4>
+          <p style="margin: 0 0 6px 0;">Have an idea, concern, or bug report?</p>
+          <ul>
+            <li>Click <strong>💬 Feedback</strong> in the navbar.</li>
+            <li>Select type: <strong>Idea</strong>, <strong>Concern</strong>, or <strong>Bug Report</strong>.</li>
+            <li>Write your message (max 1,000 characters) and click <strong>Submit Feedback</strong>.</li>
+          </ul>
+        </div>
+
+        <div class="manual-section">
+          <h4>11. Forgot Password &amp; Account Recovery</h4>
+          <p style="margin: 0 0 6px 0;">If you forget your password:</p>
+          <ol>
+            <li>Click <strong>Forgot Password?</strong> on the login page.</li>
+            <li>Enter your Username/Email, Account Creation Date, Last Remembered Password, and answer your Core Verifier: <em>"Who is the person you love the most?"</em></li>
+            <li>Enter your desired new password (min 8 chars) and submit the request.</li>
+          </ol>
+          <div class="manual-callout">
+            🎫 <strong>Recovery Ticket</strong><br>
+            &bull; You will receive a unique ticket number (format: <code>AAAAAA000000</code> &mdash; 6 uppercase letters + 6 numbers).<br>
+            &bull; <strong>Save this ticket number.</strong> It is important for tracking your progress.<br>
+            &bull; Your request will be reviewed within up to <strong>72 hours</strong>.<br>
+            &bull; A post will be made to the <strong>Habitism Facebook Page</strong> with your ticket number and status (<strong>Approved</strong> or <strong>Rejected</strong>).<br>
+            &bull; If approved, your password is updated to your new password.<br>
+            &bull; If you already have a pending recovery request, you cannot submit another until it is resolved.
+          </div>
+        </div>
+
+        <div class="manual-section">
+          <h4>12. Troubleshooting</h4>
+          <table class="manual-table">
+            <thead>
+              <tr>
+                <th>Problem</th>
+                <th>Solution</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Login failed</strong></td>
+                <td>Check your username/email and password. Make sure you selected the correct role (Standard User or Administrator).</td>
+              </tr>
+              <tr>
+                <td><strong>Calendar not glowing</strong></td>
+                <td>Complete at least 5 tasks on your committed list for today.</td>
+              </tr>
+              <tr>
+                <td><strong>Coins not in main balance</strong></td>
+                <td>Claim them from your Piggybank first.</td>
+              </tr>
+              <tr>
+                <td><strong>Forgot password not working</strong></td>
+                <td>Make sure your core verifier answer matches what you entered at signup, and check that you don't already have a pending ticket.</td>
+              </tr>
+              <tr>
+                <td><strong>Facebook post not published</strong></td>
+                <td>Depends on Facebook access token configuration by the platform.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="manual-section" style="margin-bottom: 0;">
+          <h4>13. Pre-Seeded Test Accounts</h4>
+          <p style="margin: 0 0 6px 0;">For testing, these accounts may exist:</p>
+          <ul>
+            <li><strong>Username:</strong> <code>user</code> | <strong>Password:</strong> <code>user123</code> | <strong>Role:</strong> Standard User</li>
+            <li><strong>Username:</strong> <code>admin</code> | <strong>Password:</strong> <code>admin123</code> | <strong>Role:</strong> Administrator</li>
+          </ul>
+          <p style="margin: 10px 0 0 0; text-align: center; color: #c084fc; font-weight: 700;">🌸 Habitism — Your Life-Changing Journey Begins Here</p>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="nav-btn-link btn-primary" onclick="closeModal('userManualModal')">Close Guide</button>
+      </div>
     </div>
   </div>
 
