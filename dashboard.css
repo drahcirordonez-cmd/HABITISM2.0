@@ -856,6 +856,22 @@ body {
   box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.25);
 }
 
+.footer-left-col input.input-invalid {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.32) !important;
+  animation: habitInputShake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes habitInputShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+
+.footer-left-col input.input-focus-placeholder {
+}
+
 .add-btn {
   width: 32px;
   height: 32px;
