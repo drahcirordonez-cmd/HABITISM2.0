@@ -386,8 +386,152 @@ function serverCharLimitMessage(currentLength, maxLength) {
 const KEYBOARD_MASH_PATTERNS = [
   'qwerty', 'qwertz', 'azerty', 'asdfgh', 'zxcvbn',
   'poiuyt', 'lkjhgf', 'mnbvcx', 'qazwsx', 'wsxedc',
-  'edcrfv', 'rfvtgb', 'tgbyhn', 'yhnujm', 'abcdef'
+  'edcrfv', 'rfvtgb', 'tgbyhn', 'yhnujm', 'abcdef',
+  'asdf', 'fdsa', 'adsf', 'afsd', 'sadf', 'dfas', 'fasd',
+  'sdfg', 'gfds', 'dfgh', 'hgfd', 'fghj', 'jhgf', 'ghjk', 'kjhg', 'hjkl', 'lkjh',
+  'qwer', 'rewq', 'wert', 'trew', 'erty', 'ytre', 'rtyu', 'uytr', 'tyui', 'iuyt', 'yuio', 'oiuy', 'uiop', 'poiu',
+  'zxcv', 'vcxz', 'xcvb', 'bvcx', 'cvbn', 'nbvc', 'vbnm', 'mnbv',
+  'qazw', 'wsxe', 'edcr', 'rfvt', 'tgby', 'yhnu', 'ujmi'
 ];
+
+const MASH_CONSONANT_PAIRS = /(?:df|fd|sd|ds|sf|fs|fg|gf|hj|jh|jk|kj|kl|lk|zx|xz|xc|cx|cv|vc|vb|bv|bn|nb|qw|wq)/i;
+
+function checkWordSpamError(alpha, fieldLabel = 'Name') {
+  const lower = (alpha || '').toLowerCase();
+  const len = lower.length;
+  if (!len) return `Each part of your ${fieldLabel.toLowerCase()} must contain letters.`;
+
+  if (/([a-z])\1\1/.test(lower)) {
+    return `${fieldLabel} cannot contain 3 or more repeated letters in a row (e.g. 'qqq').`;
+  }
+  if (len > 20) {
+    return `Each word in your ${fieldLabel.toLowerCase()} cannot exceed 20 characters.`;
+  }
+  if (KEYBOARD_MASH_PATTERNS.some(p => lower.includes(p))) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — keyboard spam is not allowed.`;
+  }
+  if (len >= 2 && !/[aeiouy]/.test(lower)) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — each word must contain a vowel.`;
+  }
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(lower)) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} (too many consecutive consonants).`;
+  }
+  if (/[aeiou]{4,}/.test(lower)) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} (too many consecutive vowels).`;
+  }
+
+  // Repeated 3-to-6 character chunks back-to-back (e.g. "adfadf", "asdasd", "qweqwe", "asdfasdf")
+  if (/([a-z]{3,6})\1/.test(lower)) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — repetitive letter patterns (e.g. 'adfadf') are not allowed.`;
+  }
+  // Repeated 2-character chunk 3+ times (e.g. "ababab", "adadad")
+  if (/([a-z]{2})\1\1/.test(lower)) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — repetitive letter patterns are not allowed.`;
+  }
+  // Repeated 2-character chunk twice unless it's a natural 4-5 letter CV reduplication (like Mama, Papa, Nanay, Tatay, Lolo, Lola)
+  if (len >= 4 && /^([a-z]{2})\1[a-z]*$/.test(lower)) {
+    const pair = lower.slice(0, 2);
+    const isNaturalRedup = len <= 5 && /^[bcdfghjklmnprstyz][aeiou]$/.test(pair) && !/^[qxzvw]/.test(pair);
+    if (!isNaturalRedup) {
+      return `Please enter a real ${fieldLabel.toLowerCase()} — repetitive letter patterns are not allowed.`;
+    }
+  }
+
+  // Repeated 3-letter trigram inside the same word
+  if (len >= 6) {
+    const trigrams = {};
+    for (let i = 0; i <= len - 3; i++) {
+      const tri = lower.slice(i, i + 3);
+      trigrams[tri] = (trigrams[tri] || 0) + 1;
+      if (trigrams[tri] >= 3 || (trigrams[tri] >= 2 && new Set(lower).size <= 4)) {
+        return `Please enter a real ${fieldLabel.toLowerCase()} — repetitive letter spam is not allowed.`;
+      }
+    }
+  }
+
+  // Home-row / top-row keyboard mash detection (e.g. "adf", "adfad", "adfasdf", "ghjkla")
+  const homeRowCount = (lower.match(/[asdfghjkl]/g) || []).length;
+  if (len >= 3 && homeRowCount / len >= 0.8 && MASH_CONSONANT_PAIRS.test(lower)) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — keyboard row spam is not allowed.`;
+  }
+  const topRowCount = (lower.match(/[qwertyuiop]/g) || []).length;
+  if (len >= 5 && topRowCount / len >= 0.85 && new Set(lower).size <= 4) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — keyboard row spam is not allowed.`;
+  }
+
+  // Unique letter diversity scaled by word length
+  const uniqueCount = new Set(lower).size;
+  if (
+    (len >= 5 && uniqueCount < 3) ||
+    (len >= 7 && uniqueCount < 4) ||
+    (len >= 9 && uniqueCount < 5) ||
+    (len >= 12 && uniqueCount < 6)
+  ) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — repetitive character patterns are not allowed.`;
+  }
+
+  if (/^[qxzjvw][aeiou][qxzjvw][aeiou]$/.test(lower)) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — gibberish text is not allowed.`;
+  }
+
+  return null;
+}
+
+function checkMultiWordPhraseSpamError(words, allAlpha, fieldLabel = 'Name') {
+  const cleanWords = words.map(w => w.replace(/[^a-zA-Z]/g, '').toLowerCase()).filter(Boolean);
+
+  // Check if multiple words start with the exact same 3-letter prefix (e.g. "adfadf adfadfad adfasdf")
+  for (let i = 0; i < cleanWords.length - 1; i++) {
+    const w1 = cleanWords[i];
+    const w2 = cleanWords[i + 1];
+    if (w1.length >= 3 && w2.length >= 3 && w1.slice(0, 3) === w2.slice(0, 3)) {
+      return `Please enter a real ${fieldLabel.toLowerCase()} — repeating word patterns are not allowed.`;
+    }
+  }
+
+  // Check if any 3-letter trigram repeats 3+ times across the full string
+  if (allAlpha.length >= 8) {
+    const trigrams = {};
+    for (let i = 0; i <= allAlpha.length - 3; i++) {
+      const tri = allAlpha.slice(i, i + 3);
+      trigrams[tri] = (trigrams[tri] || 0) + 1;
+      if (trigrams[tri] >= 3) {
+        return `Please enter a real ${fieldLabel.toLowerCase()} — repetitive letter spam is not allowed.`;
+      }
+    }
+  }
+
+  // Home-row dominance across the entire phrase (85%+ of letters on [asdfghjkl])
+  const homeRowCount = (allAlpha.match(/[asdfghjkl]/g) || []).length;
+  if (allAlpha.length >= 7 && homeRowCount / allAlpha.length >= 0.85) {
+    return `Please enter a real ${fieldLabel.toLowerCase()} — keyboard row spam is not allowed.`;
+  }
+
+  // Overall character diversity & frequency distribution
+  if (allAlpha.length >= 6) {
+    const counts = {};
+    for (const ch of allAlpha) counts[ch] = (counts[ch] || 0) + 1;
+    const sortedFreqs = Object.values(counts).sort((a, b) => b - a);
+    const maxFreq = sortedFreqs[0] || 0;
+    const top3Freq = (sortedFreqs[0] || 0) + (sortedFreqs[1] || 0) + (sortedFreqs[2] || 0);
+    const uniqueCount = sortedFreqs.length;
+
+    if (maxFreq / allAlpha.length > 0.45 || uniqueCount < 3) {
+      return `Please enter a real ${fieldLabel.toLowerCase()} — excessive character repetition is not allowed.`;
+    }
+    if (allAlpha.length >= 8 && uniqueCount < 4) {
+      return `Please enter a real ${fieldLabel.toLowerCase()} — excessive character repetition is not allowed.`;
+    }
+    if (allAlpha.length >= 10 && top3Freq / allAlpha.length > 0.75) {
+      return `Please enter a real ${fieldLabel.toLowerCase()} — repetitive letter spam is not allowed.`;
+    }
+    if (allAlpha.length >= 12 && (uniqueCount < 5 || uniqueCount / allAlpha.length < 0.35)) {
+      return `Please enter a real ${fieldLabel.toLowerCase()} — repetitive letter spam is not allowed.`;
+    }
+  }
+
+  return null;
+}
 
 // Allowlist of real, established email providers
 const ALLOWED_EMAIL_DOMAINS = new Set([
@@ -437,7 +581,7 @@ function serverValidateName(value) {
   }
   const name = raw.replace(/\s+$/, '');
   if (!name) return "Full name (first and last name) is required.";
-  if (name.length > 80) return serverCharLimitMessage(name.length, 80);
+  if (name.length > 50) return serverCharLimitMessage(name.length, 50);
 
   const allowedRegex = /^[a-zA-Z\s\-'.]+$/;
   if (!allowedRegex.test(name) || !/[a-zA-Z]/.test(name)) {
@@ -454,48 +598,19 @@ function serverValidateName(value) {
 
   const words = name.split(/\s+/).filter(Boolean);
 
-  // Check each word for spam/gibberish first so spam like "qqqqqqqqqqqqq" is caught with a clear anti-spam message
+  // Check each word for spam/gibberish first
   for (const word of words) {
     const alpha = word.replace(/[^a-zA-Z]/g, '');
-    if (!alpha) {
-      return "Each part of your name must contain letters.";
-    }
-    if (/([a-zA-Z])\1\1/i.test(alpha)) {
-      return "Name cannot contain 3 or more repeated letters in a row (e.g. 'qqq').";
-    }
-    if (alpha.length > 20) {
-      return "Each part of your name cannot exceed 20 characters.";
-    }
-    const lowerAlpha = alpha.toLowerCase();
-    if (KEYBOARD_MASH_PATTERNS.some(p => lowerAlpha.includes(p))) {
-      return "Please enter a real name — keyboard spam is not allowed.";
-    }
-    if (alpha.length >= 2 && !/[aeiouyAEIOUY]/.test(alpha)) {
-      return "Please enter a real name — each name part must contain a vowel.";
-    }
-    if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(alpha)) {
-      return "Please enter a real name (too many consecutive consonants).";
-    }
-    if (/[aeiou]{4,}/i.test(alpha)) {
-      return "Please enter a real name (too many consecutive vowels).";
-    }
-    if (alpha.length >= 5 && new Set(lowerAlpha).size < 3) {
-      return "Please enter a real name — repetitive character patterns are not allowed.";
-    }
-    if (alpha.length >= 6 && /^([a-z]{1,2})\1{2,}$/i.test(lowerAlpha)) {
-      return "Please enter a real name — repetitive character patterns are not allowed.";
-    }
-    if (/^[qxzjvw][aeiou][qxzjvw][aeiou]$/i.test(lowerAlpha)) {
-      return "Please enter a real name — gibberish text is not allowed.";
-    }
+    const wordErr = checkWordSpamError(alpha, 'Name');
+    if (wordErr) return wordErr;
   }
 
   // Require First and Last Name separated by a space
   if (words.length < 2) {
     return "Please enter both your first and last name separated by a space (e.g. John Doe).";
   }
-  if (words.length > 6) {
-    return "Please enter a realistic full name (maximum 6 name parts).";
+  if (words.length > 5) {
+    return "Please enter a realistic full name (maximum 5 name parts).";
   }
 
   const firstAlpha = words[0].replace(/[^a-zA-Z]/g, '');
@@ -509,14 +624,8 @@ function serverValidateName(value) {
   }
 
   const allAlpha = name.replace(/[^a-zA-Z]/g, '').toLowerCase();
-  if (allAlpha.length >= 6) {
-    const counts = {};
-    for (const ch of allAlpha) counts[ch] = (counts[ch] || 0) + 1;
-    const maxFreq = Math.max(...Object.values(counts));
-    if (maxFreq / allAlpha.length > 0.5 || new Set(allAlpha).size < 3) {
-      return "Please enter a real name — excessive character repetition is not allowed.";
-    }
-  }
+  const phraseErr = checkMultiWordPhraseSpamError(words, allAlpha, 'Name');
+  if (phraseErr) return phraseErr;
 
   return null;
 }
@@ -563,14 +672,18 @@ function serverValidateEmail(value) {
   if (/(\d)\1\1\1/.test(localPart)) {
     return "Email username cannot contain 4 or more repeated numbers in a row.";
   }
-  if (KEYBOARD_MASH_PATTERNS.some(p => localLetters.includes(p))) {
-    return "Please enter a valid email address — keyboard spam is not allowed.";
+  if (KEYBOARD_MASH_PATTERNS.some(p => localLetters.includes(p)) || /([a-z]{3,6})\1/i.test(localLetters)) {
+    return "Please enter a valid email address — keyboard or repeating spam is not allowed.";
   }
   if (localLetters.length >= 4 && !/[aeiouy]/.test(localLetters)) {
     return "Please enter a realistic email username (cannot be consonant spam).";
   }
   if (/[bcdfghjklmnpqrstvwxz]{6,}/i.test(localLetters)) {
     return "Please enter a realistic email username (too many consecutive consonants).";
+  }
+  const emailHomeRowCount = (localLetters.match(/[asdfghjkl]/g) || []).length;
+  if (localLetters.length >= 5 && emailHomeRowCount / localLetters.length >= 0.85 && MASH_CONSONANT_PAIRS.test(localLetters)) {
+    return "Please enter a valid email address — keyboard row spam is not allowed.";
   }
   if (localLetters.length >= 6 && new Set(localLetters).size < 3) {
     return "Email username contains too many repetitive characters.";
@@ -629,8 +742,8 @@ function serverValidateCoreVerifier(value) {
   if (!verifier) {
     return "Please tell us who you love the most — this keeps your account safe!";
   }
-  if (raw.length > 80) {
-    return serverCharLimitMessage(raw.length, 80);
+  if (verifier.length > 80) {
+    return serverCharLimitMessage(verifier.length, 80);
   }
   if (!/^[a-zA-Z\s\-'.]+$/.test(verifier) || !/[a-zA-Z]/.test(verifier)) {
     return "Please use letters and spaces only (no numbers or special characters).";
@@ -655,39 +768,9 @@ function serverValidateCoreVerifier(value) {
   let hasTwoPlusLetterWord = false;
   for (const word of words) {
     const alpha = word.replace(/[^a-zA-Z]/g, '');
-    if (!alpha) {
-      return "Each word in your answer must contain letters.";
-    }
     if (alpha.length >= 2) hasTwoPlusLetterWord = true;
-
-    if (/([a-zA-Z])\1\1/i.test(alpha)) {
-      return "Please enter a real answer — repeated character spam (e.g. 'qqq') is not allowed.";
-    }
-    if (alpha.length > 20) {
-      return "Each word in your answer cannot exceed 20 letters.";
-    }
-    const lowerAlpha = alpha.toLowerCase();
-    if (KEYBOARD_MASH_PATTERNS.some(p => lowerAlpha.includes(p))) {
-      return "Please enter a real answer — keyboard spam is not allowed.";
-    }
-    if (alpha.length >= 2 && !/[aeiouyAEIOUY]/.test(alpha)) {
-      return "Please enter a real name or person — words must contain a vowel.";
-    }
-    if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(alpha)) {
-      return "Please enter a real answer (too many consecutive consonants).";
-    }
-    if (/[aeiou]{4,}/i.test(alpha)) {
-      return "Please enter a real answer (too many consecutive vowels).";
-    }
-    if (alpha.length >= 5 && new Set(lowerAlpha).size < 3) {
-      return "Please enter a real answer — repetitive character patterns are not allowed.";
-    }
-    if (alpha.length >= 6 && /^([a-z]{1,2})\1{2,}$/i.test(lowerAlpha)) {
-      return "Please enter a real answer — repetitive character patterns are not allowed.";
-    }
-    if (/^[qxzjvw][aeiou][qxzjvw][aeiou]$/i.test(lowerAlpha)) {
-      return "Please enter a real answer — gibberish text is not allowed.";
-    }
+    const wordErr = checkWordSpamError(alpha, 'Answer');
+    if (wordErr) return wordErr;
   }
 
   if (!hasTwoPlusLetterWord) {
@@ -698,14 +781,8 @@ function serverValidateCoreVerifier(value) {
     return "Please do not repeat the same word multiple times.";
   }
 
-  if (allAlpha.length >= 6) {
-    const counts = {};
-    for (const ch of allAlpha) counts[ch] = (counts[ch] || 0) + 1;
-    const maxFreq = Math.max(...Object.values(counts));
-    if (maxFreq / allAlpha.length > 0.6 || new Set(allAlpha).size < 3) {
-      return "Please enter a real answer — excessive character repetition is not allowed.";
-    }
-  }
+  const phraseErr = checkMultiWordPhraseSpamError(words, allAlpha, 'Answer');
+  if (phraseErr) return phraseErr;
 
   return null;
 }
@@ -730,14 +807,18 @@ function serverValidateUsername(value) {
   if (/(\d)\1\1\1/.test(username)) {
     return "Username cannot contain 4 or more repeated numbers in a row.";
   }
-  if (KEYBOARD_MASH_PATTERNS.some(p => letters.includes(p))) {
-    return "Username cannot contain keyboard spam patterns (e.g. 'qwerty', 'asdfgh').";
+  if (KEYBOARD_MASH_PATTERNS.some(p => letters.includes(p)) || /([a-z]{2,5})\1/i.test(letters)) {
+    return "Username cannot contain keyboard spam or repeating letter patterns.";
   }
   if (letters.length >= 3 && !/[aeiouy]/.test(letters)) {
     return "Username must contain at least one vowel (cannot be consonant spam).";
   }
   if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(letters)) {
     return "Username contains too many consecutive consonants.";
+  }
+  const userHomeRowCount = (letters.match(/[asdfghjkl]/g) || []).length;
+  if (letters.length >= 4 && userHomeRowCount / letters.length >= 0.8 && MASH_CONSONANT_PAIRS.test(letters)) {
+    return "Username cannot contain keyboard row spam.";
   }
   if (username.length >= 5 && new Set(username.toLowerCase()).size < 3) {
     return "Username contains too many repetitive characters.";
