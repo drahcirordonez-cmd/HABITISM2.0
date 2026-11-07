@@ -432,6 +432,9 @@ function isAllowedEmailDomain(domain) {
 
 function serverValidateName(value) {
   const raw = value === null || value === undefined ? '' : String(value);
+  if (/^\s/.test(raw)) {
+    return "Full name cannot begin with a space.";
+  }
   const name = raw.trim();
   if (!name) return "Full name (first and last name) is required.";
   if (raw.length > 80) return serverCharLimitMessage(raw.length, 80);

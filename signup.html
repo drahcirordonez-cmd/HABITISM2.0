@@ -504,6 +504,9 @@
 
     function validateName(value) {
       const raw = value || '';
+      if (/^\s/.test(raw)) {
+        return "Full name cannot begin with a space.";
+      }
       const name = raw.trim();
       if (!name) {
         return "Full name (first and last name) is required.";
@@ -913,7 +916,7 @@
         const len = updateCharCounter(nameInput, nameCounter, 80);
         if (len > 80) {
           setFieldError("signupName", "nameError", getCharLimitError(len, 80));
-        } else if (nameInput.classList.contains("is-invalid") || /([a-zA-Z])\1\1/i.test(nameInput.value)) {
+        } else if (/^\s/.test(nameInput.value) || nameInput.classList.contains("is-invalid") || /([a-zA-Z])\1\1/i.test(nameInput.value)) {
           setFieldError("signupName", "nameError", validateName(nameInput.value));
         } else {
           setFieldError("signupName", "nameError", "");
@@ -1075,7 +1078,7 @@
 
       try {
         const user = await Habitism.register(
-          nameInput.value.trim(),
+          nameInput.value,
           usernameInput.value.trim(),
           emailInput.value.trim(),
           passwordInput.value,
