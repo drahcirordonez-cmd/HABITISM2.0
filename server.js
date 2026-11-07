@@ -537,8 +537,8 @@ function serverValidateEmail(value) {
 
   if (!localPart) return "Email is missing a username before '@'.";
   if (localPart.length > 64) return serverCharLimitMessage(localPart.length, 64);
-  if (localPart.length < 3) {
-    return "The username before '@' must be at least 3 characters long.";
+  if (localPart.length < 7) {
+    return "The username before '@' must be at least 7 characters long.";
   }
   if (/^[._+-]|[._+-]$/.test(localPart)) {
     return "The part before '@' cannot start or end with a dot, hyphen, or underscore.";
