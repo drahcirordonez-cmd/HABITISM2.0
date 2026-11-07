@@ -435,9 +435,9 @@ function serverValidateName(value) {
   if (/^\s/.test(raw)) {
     return "Full name cannot begin with a space.";
   }
-  const name = raw.trim();
+  const name = raw.replace(/\s+$/, '');
   if (!name) return "Full name (first and last name) is required.";
-  if (raw.length > 80) return serverCharLimitMessage(raw.length, 80);
+  if (name.length > 80) return serverCharLimitMessage(name.length, 80);
 
   const allowedRegex = /^[a-zA-Z\s\-'.]+$/;
   if (!allowedRegex.test(name) || !/[a-zA-Z]/.test(name)) {
