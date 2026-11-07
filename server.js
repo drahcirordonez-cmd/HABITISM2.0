@@ -383,14 +383,138 @@ function serverCharLimitMessage(currentLength, maxLength) {
   return `This field can have up to ${maxLength} characters. You've used ${currentLength}—please remove ${excess} character${excess === 1 ? '' : 's'}.`;
 }
 
+const KEYBOARD_MASH_PATTERNS = [
+  'qwerty', 'qwertz', 'azerty', 'asdfgh', 'zxcvbn',
+  'poiuyt', 'lkjhgf', 'mnbvcx', 'qazwsx', 'wsxedc',
+  'edcrfv', 'rfvtgb', 'tgbyhn', 'yhnujm', 'abcdef'
+];
+
+// Allowlist of real, established email providers
+const ALLOWED_EMAIL_DOMAINS = new Set([
+  // Google
+  'gmail.com', 'googlemail.com',
+  // Microsoft
+  'outlook.com', 'outlook.ph', 'hotmail.com', 'hotmail.co.uk', 'live.com', 'msn.com',
+  // Yahoo
+  'yahoo.com', 'yahoo.com.ph', 'yahoo.co.uk', 'ymail.com', 'rocketmail.com',
+  // Apple
+  'icloud.com', 'me.com', 'mac.com',
+  // Proton & Privacy
+  'proton.me', 'protonmail.com', 'pm.me', 'tutanota.com', 'tuta.com',
+  // Other Established Global Providers
+  'aol.com', 'zoho.com', 'zohomail.com', 'gmx.com', 'gmx.us', 'mail.com',
+  'fastmail.com', 'hey.com', 'yandex.com',
+  // Official Habitism Domain
+  'habitism.app'
+]);
+
+function isAllowedEmailDomain(domain) {
+  const lower = (domain || '').toLowerCase().trim();
+  if (ALLOWED_EMAIL_DOMAINS.has(lower)) return true;
+
+  // Also allow verified educational/academic/government domains (e.g. .edu, .edu.ph, .ac.uk, .gov, .gov.ph)
+  // as long as the institution label is a legitimate name (at least 2 letters, no character spam).
+  const institutionalMatch = lower.match(/^([a-z0-9-]+(?:\.[a-z0-9-]+)*)\.(edu|edu\.[a-z]{2}|ac\.[a-z]{2}|gov|gov\.[a-z]{2})$/);
+  if (institutionalMatch) {
+    const orgLabels = institutionalMatch[1].split('.');
+    for (const label of orgLabels) {
+      if (label.length < 2) return false;
+      if (!/[a-z]/.test(label)) return false;
+      if (/([a-z0-9])\1\1/.test(label)) return false;
+      if (label.length >= 4 && !/[aeiouy]/.test(label)) return false;
+      if (KEYBOARD_MASH_PATTERNS.some(p => label.includes(p))) return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 function serverValidateName(value) {
-  const name = (value || '').trim();
-  if (!name) return "Name is required.";
-  if (name.length > 80) return serverCharLimitMessage(name.length, 80);
+  const raw = value === null || value === undefined ? '' : String(value);
+  const name = raw.trim();
+  if (!name) return "Full name (first and last name) is required.";
+  if (raw.length > 80) return serverCharLimitMessage(raw.length, 80);
+
   const allowedRegex = /^[a-zA-Z\s\-'.]+$/;
   if (!allowedRegex.test(name) || !/[a-zA-Z]/.test(name)) {
     return "Name cannot contain numbers or special characters.";
   }
+
+  if (/\s{2,}/.test(name)) {
+    return "Please use only a single space between names.";
+  }
+
+  if (/^[.\-']|[.\-']$/.test(name) || /[.\-']{2,}/.test(name)) {
+    return "Name contains invalid punctuation placement.";
+  }
+
+  const words = name.split(/\s+/).filter(Boolean);
+
+  // Check each word for spam/gibberish first so spam like "qqqqqqqqqqqqq" is caught with a clear anti-spam message
+  for (const word of words) {
+    const alpha = word.replace(/[^a-zA-Z]/g, '');
+    if (!alpha) {
+      return "Each part of your name must contain letters.";
+    }
+    if (/([a-zA-Z])\1\1/i.test(alpha)) {
+      return "Name cannot contain 3 or more repeated letters in a row (e.g. 'qqq').";
+    }
+    if (alpha.length > 20) {
+      return "Each part of your name cannot exceed 20 characters.";
+    }
+    const lowerAlpha = alpha.toLowerCase();
+    if (KEYBOARD_MASH_PATTERNS.some(p => lowerAlpha.includes(p))) {
+      return "Please enter a real name — keyboard spam is not allowed.";
+    }
+    if (alpha.length >= 2 && !/[aeiouyAEIOUY]/.test(alpha)) {
+      return "Please enter a real name — each name part must contain a vowel.";
+    }
+    if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(alpha)) {
+      return "Please enter a real name (too many consecutive consonants).";
+    }
+    if (/[aeiou]{4,}/i.test(alpha)) {
+      return "Please enter a real name (too many consecutive vowels).";
+    }
+    if (alpha.length >= 5 && new Set(lowerAlpha).size < 3) {
+      return "Please enter a real name — repetitive character patterns are not allowed.";
+    }
+    if (alpha.length >= 6 && /^([a-z]{1,2})\1{2,}$/i.test(lowerAlpha)) {
+      return "Please enter a real name — repetitive character patterns are not allowed.";
+    }
+    if (/^[qxzjvw][aeiou][qxzjvw][aeiou]$/i.test(lowerAlpha)) {
+      return "Please enter a real name — gibberish text is not allowed.";
+    }
+  }
+
+  // Require First and Last Name separated by a space
+  if (words.length < 2) {
+    return "Please enter both your first and last name separated by a space (e.g. John Doe).";
+  }
+  if (words.length > 6) {
+    return "Please enter a realistic full name (maximum 6 name parts).";
+  }
+
+  const firstAlpha = words[0].replace(/[^a-zA-Z]/g, '');
+  const lastAlpha = words[words.length - 1].replace(/[^a-zA-Z]/g, '');
+  if (firstAlpha.length < 2 || lastAlpha.length < 2) {
+    return "Both your first name and last name must be at least 2 letters long.";
+  }
+
+  if (words.every(w => w.replace(/[^a-zA-Z]/g, '').toLowerCase() === firstAlpha.toLowerCase())) {
+    return "First name and last name cannot be identical.";
+  }
+
+  const allAlpha = name.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  if (allAlpha.length >= 6) {
+    const counts = {};
+    for (const ch of allAlpha) counts[ch] = (counts[ch] || 0) + 1;
+    const maxFreq = Math.max(...Object.values(counts));
+    if (maxFreq / allAlpha.length > 0.5 || new Set(allAlpha).size < 3) {
+      return "Please enter a real name — excessive character repetition is not allowed.";
+    }
+  }
+
   return null;
 }
 
@@ -399,7 +523,7 @@ function serverValidateEmail(value) {
   const email = raw.trim();
 
   if (!email) return "Email address is required.";
-  if (email.length > 254) return serverCharLimitMessage(email.length, 254);
+  if (raw.length > 254) return serverCharLimitMessage(raw.length, 254);
   if (/\s/.test(email)) return "Email address cannot contain spaces.";
   if (email.includes('..')) return "Email address cannot contain consecutive dots ('..').";
 
@@ -409,19 +533,50 @@ function serverValidateEmail(value) {
 
   const atIndex = email.indexOf('@');
   const localPart = email.slice(0, atIndex);
-  const domain = email.slice(atIndex + 1);
+  const domain = email.slice(atIndex + 1).toLowerCase();
 
   if (!localPart) return "Email is missing a username before '@'.";
   if (localPart.length > 64) return serverCharLimitMessage(localPart.length, 64);
-  if (localPart.startsWith('.') || localPart.endsWith('.')) return "The part before '@' cannot start or end with a dot.";
+  if (localPart.length < 3) {
+    return "The username before '@' must be at least 3 characters long.";
+  }
+  if (/^[._+-]|[._+-]$/.test(localPart)) {
+    return "The part before '@' cannot start or end with a dot, hyphen, or underscore.";
+  }
+  if (/([._+-])\1/.test(localPart)) {
+    return "The part before '@' cannot contain consecutive special characters.";
+  }
   if (!/^[a-zA-Z0-9._+-]+$/.test(localPart)) {
     return "The part before '@' can only contain letters, numbers, dots, underscores, hyphens, or '+'.";
   }
 
-  if (!domain) return "Email is missing a domain after '@' (e.g. example.com).";
+  const localLetters = (localPart.match(/[a-zA-Z]/g) || []).join('').toLowerCase();
+  if (localLetters.length < 2) {
+    return "The part before '@' must contain at least 2 letters.";
+  }
+  if (/([a-zA-Z])\1\1/i.test(localPart)) {
+    return "Email username cannot contain 3 or more repeated letters in a row (e.g. 'qqq').";
+  }
+  if (/(\d)\1\1\1/.test(localPart)) {
+    return "Email username cannot contain 4 or more repeated numbers in a row.";
+  }
+  if (KEYBOARD_MASH_PATTERNS.some(p => localLetters.includes(p))) {
+    return "Please enter a valid email address — keyboard spam is not allowed.";
+  }
+  if (localLetters.length >= 4 && !/[aeiouy]/.test(localLetters)) {
+    return "Please enter a realistic email username (cannot be consonant spam).";
+  }
+  if (/[bcdfghjklmnpqrstvwxz]{6,}/i.test(localLetters)) {
+    return "Please enter a realistic email username (too many consecutive consonants).";
+  }
+  if (localLetters.length >= 6 && new Set(localLetters).size < 3) {
+    return "Email username contains too many repetitive characters.";
+  }
+
+  if (!domain) return "Email is missing a domain after '@' (e.g. gmail.com).";
   if (domain.startsWith('.') || domain.endsWith('.')) return "Email domain cannot start or end with a dot.";
   if (domain.startsWith('-') || domain.endsWith('-')) return "Email domain cannot start or end with a hyphen.";
-  if (!domain.includes('.')) return "Email domain must contain at least one dot (e.g. example.com).";
+  if (!domain.includes('.')) return "Email domain must contain at least one dot (e.g. gmail.com).";
 
   const domainParts = domain.split('.');
   if (domainParts.length < 2) {
@@ -441,6 +596,10 @@ function serverValidateEmail(value) {
     return "Email must end with a valid domain extension like .com or .org.";
   }
 
+  if (!isAllowedEmailDomain(domain)) {
+    return "Please use an email from a recognized provider (e.g. gmail.com, yahoo.com, outlook.com, icloud.com, or an official .edu/.gov address).";
+  }
+
   return null;
 }
 
@@ -452,31 +611,135 @@ function serverValidatePassword(value) {
   if (password.length < 8) return "Password must be at least 8 characters long.";
   if (!/[a-zA-Z]/.test(password)) return "Password must contain at least one letter (a-z, A-Z).";
   if (!/[0-9]/.test(password)) return "Password must contain at least one number (0-9).";
+  if (/([a-zA-Z])\1\1/i.test(password) || /(.)\1\1\1/.test(password)) {
+    return "Password cannot contain repeated character spam (e.g. 'qqq' or '1111').";
+  }
+  if (new Set(password.toLowerCase()).size < 4) {
+    return "Password is too repetitive — please use at least 4 distinct characters.";
+  }
   return null;
 }
 
 function serverValidateCoreVerifier(value) {
-  const verifier = (value || '').trim();
+  const raw = value === null || value === undefined ? '' : String(value);
+  const verifier = raw.trim();
   if (!verifier) {
     return "Please tell us who you love the most — this keeps your account safe!";
   }
-  if (verifier.length > 80) {
-    return serverCharLimitMessage(verifier.length, 80);
+  if (raw.length > 80) {
+    return serverCharLimitMessage(raw.length, 80);
   }
-  if (!/^[a-zA-Z\s]+$/.test(verifier)) {
+  if (!/^[a-zA-Z\s\-'.]+$/.test(verifier) || !/[a-zA-Z]/.test(verifier)) {
     return "Please use letters and spaces only (no numbers or special characters).";
   }
+  if (/\s{2,}/.test(verifier)) {
+    return "Please use only a single space between words.";
+  }
+  if (/^[.\-']|[.\-']$/.test(verifier) || /[.\-']{2,}/.test(verifier)) {
+    return "Please enter a valid name or relationship without excessive punctuation.";
+  }
+
+  const allAlpha = verifier.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  if (allAlpha.length < 2) {
+    return "Answer must be at least 2 letters long.";
+  }
+
+  const words = verifier.split(/\s+/).filter(Boolean);
+  if (words.length > 8) {
+    return "Please keep your answer concise (maximum 8 words).";
+  }
+
+  let hasTwoPlusLetterWord = false;
+  for (const word of words) {
+    const alpha = word.replace(/[^a-zA-Z]/g, '');
+    if (!alpha) {
+      return "Each word in your answer must contain letters.";
+    }
+    if (alpha.length >= 2) hasTwoPlusLetterWord = true;
+
+    if (/([a-zA-Z])\1\1/i.test(alpha)) {
+      return "Please enter a real answer — repeated character spam (e.g. 'qqq') is not allowed.";
+    }
+    if (alpha.length > 20) {
+      return "Each word in your answer cannot exceed 20 letters.";
+    }
+    const lowerAlpha = alpha.toLowerCase();
+    if (KEYBOARD_MASH_PATTERNS.some(p => lowerAlpha.includes(p))) {
+      return "Please enter a real answer — keyboard spam is not allowed.";
+    }
+    if (alpha.length >= 2 && !/[aeiouyAEIOUY]/.test(alpha)) {
+      return "Please enter a real name or person — words must contain a vowel.";
+    }
+    if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(alpha)) {
+      return "Please enter a real answer (too many consecutive consonants).";
+    }
+    if (/[aeiou]{4,}/i.test(alpha)) {
+      return "Please enter a real answer (too many consecutive vowels).";
+    }
+    if (alpha.length >= 5 && new Set(lowerAlpha).size < 3) {
+      return "Please enter a real answer — repetitive character patterns are not allowed.";
+    }
+    if (alpha.length >= 6 && /^([a-z]{1,2})\1{2,}$/i.test(lowerAlpha)) {
+      return "Please enter a real answer — repetitive character patterns are not allowed.";
+    }
+    if (/^[qxzjvw][aeiou][qxzjvw][aeiou]$/i.test(lowerAlpha)) {
+      return "Please enter a real answer — gibberish text is not allowed.";
+    }
+  }
+
+  if (!hasTwoPlusLetterWord) {
+    return "Please enter a meaningful name or relationship (at least 2 letters).";
+  }
+
+  if (words.length >= 2 && words.every(w => w.replace(/[^a-zA-Z]/g, '').toLowerCase() === words[0].replace(/[^a-zA-Z]/g, '').toLowerCase())) {
+    return "Please do not repeat the same word multiple times.";
+  }
+
+  if (allAlpha.length >= 6) {
+    const counts = {};
+    for (const ch of allAlpha) counts[ch] = (counts[ch] || 0) + 1;
+    const maxFreq = Math.max(...Object.values(counts));
+    if (maxFreq / allAlpha.length > 0.6 || new Set(allAlpha).size < 3) {
+      return "Please enter a real answer — excessive character repetition is not allowed.";
+    }
+  }
+
   return null;
 }
 
 function serverValidateUsername(value) {
-  const username = (value || '').trim();
+  const raw = value === null || value === undefined ? '' : String(value);
+  const username = raw.trim();
   if (!username) return "Username is required.";
-  if (username.length > 16) return serverCharLimitMessage(username.length, 16);
+  if (raw.length > 16) return serverCharLimitMessage(raw.length, 16);
   if (username.length < 3) return "Username must be at least 3 characters.";
   if (!/^[a-zA-Z0-9]+$/.test(username)) {
     return "Username can only contain letters and numbers.";
   }
+
+  const letters = (username.match(/[a-zA-Z]/g) || []).join('').toLowerCase();
+  if (letters.length < 2) {
+    return "Username must contain at least 2 letters.";
+  }
+  if (/([a-zA-Z])\1\1/i.test(username)) {
+    return "Username cannot contain 3 or more repeated letters in a row (e.g. 'qqq').";
+  }
+  if (/(\d)\1\1\1/.test(username)) {
+    return "Username cannot contain 4 or more repeated numbers in a row.";
+  }
+  if (KEYBOARD_MASH_PATTERNS.some(p => letters.includes(p))) {
+    return "Username cannot contain keyboard spam patterns (e.g. 'qwerty', 'asdfgh').";
+  }
+  if (letters.length >= 3 && !/[aeiouy]/.test(letters)) {
+    return "Username must contain at least one vowel (cannot be consonant spam).";
+  }
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(letters)) {
+    return "Username contains too many consecutive consonants.";
+  }
+  if (username.length >= 5 && new Set(username.toLowerCase()).size < 3) {
+    return "Username contains too many repetitive characters.";
+  }
+
   return null;
 }
 
@@ -732,15 +995,10 @@ app.post('/api/auth/forgot-password', (req, res) => {
   }
 
   // 6. Validate Core Verifier: "Who is the person you love the most?" (no check against stored answer; admin reviews manually)
-  if (!cleanCoreVerifier) {
+  const verifierError = serverValidateCoreVerifier(cleanCoreVerifier);
+  if (verifierError) {
     return res.status(400).json({
-      error: 'Please tell us who is the person you love the most so our admin team can verify your identity.',
-      field: 'coreVerifier'
-    });
-  }
-  if (cleanCoreVerifier.length > 80) {
-    return res.status(400).json({
-      error: 'Answer cannot exceed 80 characters.',
+      error: verifierError,
       field: 'coreVerifier'
     });
   }
